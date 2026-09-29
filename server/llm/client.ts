@@ -1,4 +1,5 @@
 import { MockLLM } from './mock';
+import { llmTimeoutMs } from './timeout';
 
 export interface CompletionRequest {
   system: string;
@@ -18,21 +19,35 @@ class OpenAICompatibleClient implements LLMClient {
   ) {}
 
   async complete(req: CompletionRequest): Promise<string> {
-    const res = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.model,
-        temperature: req.temperature ?? 0.3,
-        messages: [
-          { role: 'system', content: req.system },
-          { role: 'user', content: req.user },
-        ],
-      }),
-    });
+    const timeoutMs = llmTimeoutMs();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: this.model,
+          temperature: req.temperature ?? 0.3,
+          messages: [
+            { role: 'system', content: req.system },
+            { role: 'user', content: req.user },
+          ],
+        }),
+      });
+    } catch (err) {
+      if (err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError')) {
+        throw new Error(`LLM request timed out after ${timeoutMs}ms`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`LLM request failed (${res.status}): ${body.slice(0, 500)}`);

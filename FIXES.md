@@ -54,6 +54,14 @@
 - Root cause: `runTriage` logged a single summary string after a successful store and logged nothing on failure.
 - Fix (and why this layer): Log one JSON object per attempt from the triage service, including query, retrieved id/score/status, the prompt, and the raw response, then store the result. On failure, log `triage_error` with the same context and rethrow, so the previous stored result is left in place and the error is not swallowed. The log stays on the server. It does not include internal notes, and it is not returned to the browser.
 - Verification (test name or manual steps): `tests/triageLog.test.ts`.
+- Commit: e57daee
+
+### 8. A hung model call never finished, and a failure must not wipe a good result  [priority: med]
+- Symptom: `OpenAICompatibleClient` called `fetch` with no deadline. A provider that accepted the connection and never responded left `POST /api/tickets/:id/triage` open forever. A rate-limit error already left the previous stored triage in place; that had to stay true once timeouts were added.
+- Reproduction: A test client whose `complete()` never resolves. `runTriage` did not return until the test runner killed it at 1500ms. Separately, a client that throws `429` after a successful triage left the stored result unchanged (verified, then locked in).
+- Root cause: Nothing raced the model promise against a timer, and the HTTP client did not abort the socket.
+- Fix (and why this layer): `withTimeout` wraps the call in `runTriage`, so every provider including the mock is bounded (`LLM_TIMEOUT_MS`, default 20s). The OpenAI-compatible client also aborts its own `fetch`. A timeout throws before `triageResults.set`, so the previous result stays. Invalid `LLM_TIMEOUT_MS` throws instead of being ignored. The in-flight provider request is not cancelled when the wrapper is the thing that fires first; the fetch abort covers the real HTTP client. Assumption: 20 seconds is long enough for a normal completion and short enough that an agent is not stuck on a dead connection.
+- Verification (test name or manual steps): `tests/llmTimeout.test.ts`.
 - Commit:
 
 ## Found but not fixed

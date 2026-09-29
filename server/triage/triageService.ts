@@ -6,6 +6,7 @@ import { parseTriageResponse } from './parser';
 import { enforceEscalationFloor, enforceRefundWindow } from './policyGuards';
 import { findLeakedInternalNote } from './replySafety';
 import { getLLMClient } from '../llm/client';
+import { llmTimeoutMs, withTimeout } from '../llm/timeout';
 
 export async function runTriage(ticket: Ticket): Promise<TriageResult> {
   const query = `${ticket.subject} ${ticket.message}`;
@@ -26,7 +27,10 @@ export async function runTriage(ticket: Ticket): Promise<TriageResult> {
   let raw = '';
   try {
     const llm = getLLMClient();
-    raw = await llm.complete({ system: SYSTEM_PROMPT, user: prompt });
+    raw = await withTimeout(
+      llm.complete({ system: SYSTEM_PROMPT, user: prompt }),
+      llmTimeoutMs()
+    );
     const parsed = enforceEscalationFloor(
       ticket,
       enforceRefundWindow(ticket, parseTriageResponse(raw))

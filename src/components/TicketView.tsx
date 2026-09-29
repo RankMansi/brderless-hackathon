@@ -6,7 +6,7 @@ import {
   generateTriage,
   shouldGenerateMissingTriage,
 } from '../api';
-import { shouldApplyTriage } from '../triageFreshness';
+import { isCurrentRequest, shouldApplyTriage } from '../triageFreshness';
 import { TriagePanel } from './TriagePanel';
 
 interface Props {
@@ -44,6 +44,7 @@ export function TicketView({ ticketId, onTriageComplete }: Props) {
     // arrive after the agent has switched tickets or clicked Regenerate.
     fetchTriage(requestedId)
       .catch((error: unknown) => {
+        if (!isCurrentRequest(gen, generation.current)) throw error;
         if (!shouldGenerateMissingTriage(error)) throw error;
         return generateTriage(requestedId).then((r) => {
           // The result is already stored for this ticket, so the list should
@@ -61,6 +62,10 @@ export function TicketView({ ticketId, onTriageComplete }: Props) {
       .finally(() => {
         if (generation.current === gen) setTriageLoading(false);
       });
+
+    return () => {
+      if (generation.current === gen) generation.current += 1;
+    };
   }, [ticketId, onTriageComplete]);
 
   const regenerate = () => {

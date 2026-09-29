@@ -150,6 +150,14 @@
 - Root cause: The model classified any message containing “password” as security, while retrieval treated `password`/`login` alone as security intent.
 - Fix (and why this layer): Retrieval now requires actual incident intent such as security, unauthorized access, suspicious login, hacking, or compromised credentials. A deterministic post-parse category rule maps password-reset delivery failures to `account` unless incident language is also present. Retrieval controls citations; the business-rule layer protects routing from model drift.
 - Verification (test name or manual steps): `tests/accountClassification.test.ts`; T-1004 security regressions remain covered by retrieval, escalation, and business-policy tests.
+- Commit: 47417af
+
+### 20. A superseded triage load could still start fallback generation  [priority: med]
+- Symptom: The stale-response guard stopped an old result from rendering, but an old `GET /triage` that returned 404 after a ticket switch could still issue a new POST. React Strict Mode’s effect replay made this especially easy on first load. The service coalesced duplicate same-ticket calls, but the browser still performed unnecessary writes and refreshes.
+- Reproduction: Start a triage load, switch tickets before its 404 returns, and inspect network traffic. Before the fix the obsolete request still entered the fallback `generateTriage` branch.
+- Root cause: Request generation was checked only when applying the final result, not before starting the fallback mutation, and the effect had no cleanup invalidation.
+- Fix (and why this layer): The view now checks request generation before POSTing and invalidates the generation in effect cleanup. The existing result/ticket-id guard remains in place. This belongs in the client lifecycle because the server cannot know whether a browser has changed selection.
+- Verification (test name or manual steps): `tests/triageRequestState.test.ts` and `tests/triageFreshness.test.ts`. Manual: with a delayed triage GET, switch tickets before the 404 and confirm no POST is sent for the abandoned selection.
 - Commit: (this commit)
 
 ## Found but not fixed

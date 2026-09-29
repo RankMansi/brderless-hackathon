@@ -3,6 +3,7 @@ import { db } from '../store';
 import { searchPolicies } from '../retrieval/policySearch';
 import { buildTriagePrompt, SYSTEM_PROMPT } from './promptBuilder';
 import { parseTriageResponse } from './parser';
+import { enforceRefundWindow } from './policyGuards';
 import { findLeakedInternalNote } from './replySafety';
 import { getLLMClient } from '../llm/client';
 
@@ -17,7 +18,7 @@ export async function runTriage(ticket: Ticket): Promise<TriageResult> {
 
   const llm = getLLMClient();
   const raw = await llm.complete({ system: SYSTEM_PROMPT, user: prompt });
-  const parsed = parseTriageResponse(raw);
+  const parsed = enforceRefundWindow(ticket, parseTriageResponse(raw));
 
   if (findLeakedInternalNote(parsed.reply, ticket.internalNotes)) {
     throw new Error(

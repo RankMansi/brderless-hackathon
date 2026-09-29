@@ -49,6 +49,16 @@ function hash(s: string): number {
 }
 
 function ticketSection(prompt: string): string {
+  // Prefer the delimited customer block. The system prompt now contains words
+  // like "refund" and "untrusted", and policies may appear before the ticket;
+  // slicing at "Relevant policies:" would classify from the instructions.
+  const startMark = '<<<UNTRUSTED CUSTOMER TICKET>>>';
+  const endMark = '<<<END UNTRUSTED CUSTOMER TICKET>>>';
+  const start = prompt.indexOf(startMark);
+  const end = prompt.indexOf(endMark);
+  if (start !== -1 && end > start) {
+    return prompt.slice(start + startMark.length, end);
+  }
   const idx = prompt.indexOf('Relevant policies:');
   return idx === -1 ? prompt : prompt.slice(0, idx);
 }

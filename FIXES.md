@@ -38,14 +38,14 @@
 - Root cause: `parseTriageResponse` passed model strings through with `String(...)` and `Boolean(...)`. `Boolean("false")` is `true` in JavaScript. The list filter and badge class names use exact equality against `high` | `medium` | `low`.
 - Fix (and why this layer): Normalize at the parser, which is the boundary for model output. Synonyms map onto the closed `Category` and `Urgency` unions in `shared/types.ts`; unknown labels, an empty reply, and malformed JSON throw instead of being stored. The UI was left on strict equality so a future drift fails closed at the parser rather than being papered over in the component.
 - Verification (test name or manual steps): `tests/parser.test.ts` (normalization table, string `"false"`, unknown category, empty reply, malformed JSON). Manual: triage several tickets, set "Urgency: high", and confirm high-urgency tickets stay visible with a red badge.
-- Commit:
+- Commit: 48326b9
 
 ### 6. Switching tickets showed another ticket's triage  [priority: med]
-- Symptom:
-- Reproduction:
-- Root cause:
-- Fix (and why this layer):
-- Verification (test name or manual steps):
+- Symptom: Opening one ticket and immediately selecting another could leave the second ticket showing the first ticket's category, urgency, and drafted reply. The mismatch was visible in the reply text (and in `generatedAt` belonging to the other run). Regenerating and then switching tickets had the same race.
+- Reproduction: Run `npm run dev`. Click an untriaged ticket (T-1003), then immediately click T-1012 before the first request finishes. The mock waits 250–650ms, so T-1012 can render T-1003's triage. Repeat with Regenerate on one ticket, then switch before it returns.
+- Root cause: `TicketView` kept the previous `triage` state when `ticketId` changed, and the in-flight promise always called `setTriage`. There was no generation or `ticketId` check. The same gap existed on Regenerate.
+- Fix (and why this layer): In `TicketView`, clear ticket and triage state when the selection changes, and apply a response only when `shouldApplyTriage` says the request generation and `result.ticketId` are still current. The bug is a client race; the API result itself is stored under the correct ticket id.
+- Verification (test name or manual steps): `tests/triageFreshness.test.ts`. Manual: select T-1003, immediately select T-1012, and confirm the panel shows "Running AI triage…" and then a reply that does not mention the outage or INC details. The reply and the ticket id on screen must match. Click Regenerate on T-1003 and switch to T-1012 before it finishes; T-1012 must not keep T-1003's draft.
 - Commit:
 
 ### 7. Triage was not debuggable from logs  [priority: med]

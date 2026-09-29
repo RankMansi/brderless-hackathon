@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Ticket, TriageResult } from '../../shared/types';
 import { fetchTicket, fetchTriage, generateTriage } from '../api';
+import { shouldApplyTriage } from '../triageFreshness';
 import { TriagePanel } from './TriagePanel';
 
 interface Props {
@@ -13,31 +14,64 @@ export function TicketView({ ticketId, onTriageComplete }: Props) {
   const [triage, setTriage] = useState<TriageResult | null>(null);
   const [triageLoading, setTriageLoading] = useState(false);
   const [triageError, setTriageError] = useState<string | null>(null);
+  const generation = useRef(0);
 
   useEffect(() => {
+    const gen = ++generation.current;
+    const requestedId = ticketId;
     setTicket(null);
-    fetchTicket(ticketId).then(setTicket).catch(() => setTicket(null));
+    setTriage(null);
+    setTriageLoading(true);
+    setTriageError(null);
+
+    fetchTicket(requestedId)
+      .then((next) => {
+        if (generation.current === gen) setTicket(next);
+      })
+      .catch(() => {
+        if (generation.current === gen) setTicket(null);
+      });
 
     // Load the existing triage, or generate one on first view.
-    setTriageLoading(true);
-    setTriageError(null);
-    fetchTriage(ticketId)
-      .catch(() => generateTriage(ticketId).then((r) => (onTriageComplete(), r)))
-      .then((result) => setTriage(result))
-      .catch((e: Error) => setTriageError(e.message))
-      .finally(() => setTriageLoading(false));
-  }, [ticketId]);
+    // Clear the previous ticket's result first, and drop responses that
+    // arrive after the agent has switched tickets or clicked Regenerate.
+    fetchTriage(requestedId)
+      .catch(() =>
+        generateTriage(requestedId).then((r) => {
+          // The result is already stored for this ticket, so the list should
+          // refresh even if the agent has moved on. The detail pane stays gated.
+          onTriageComplete();
+          return r;
+        })
+      )
+      .then((result) => {
+        if (shouldApplyTriage(requestedId, result, gen, generation.current)) setTriage(result);
+      })
+      .catch((e: Error) => {
+        if (generation.current === gen) setTriageError(e.message);
+      })
+      .finally(() => {
+        if (generation.current === gen) setTriageLoading(false);
+      });
+  }, [ticketId, onTriageComplete]);
 
   const regenerate = () => {
+    const gen = ++generation.current;
+    const requestedId = ticketId;
     setTriageLoading(true);
     setTriageError(null);
-    generateTriage(ticketId)
+    generateTriage(requestedId)
       .then((result) => {
-        setTriage(result);
         onTriageComplete();
+        if (!shouldApplyTriage(requestedId, result, gen, generation.current)) return;
+        setTriage(result);
       })
-      .catch((e: Error) => setTriageError(e.message))
-      .finally(() => setTriageLoading(false));
+      .catch((e: Error) => {
+        if (generation.current === gen) setTriageError(e.message);
+      })
+      .finally(() => {
+        if (generation.current === gen) setTriageLoading(false);
+      });
   };
 
   if (!ticket) return <div className="empty-state">Loading ticket…</div>;

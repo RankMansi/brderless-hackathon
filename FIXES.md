@@ -28,7 +28,7 @@
 - Symptom: T-1004 (unauthorized sign-ins from Jakarta and Lagos, calmly worded "No rush, just curious") was not escalated. T-1007 (GDPR export) was not escalated. A model can also return `escalate: false` for an enterprise outage (T-1003). Security, privacy, and enterprise SLA policies all require escalation regardless of tone.
 - Reproduction: `POST /api/tickets/T-1004/triage` and `POST /api/tickets/T-1007/triage` returned `escalate: false`. A stand-in model that returns `escalate: false` for T-1003 was stored as-is.
 - Root cause: `runTriage` copied `escalate` from the model. The mock (and a typical model) judges tone: loud complaints escalate, calm ones do not. The policies are not tone-based.
-- Fix (and why this layer): `enforceEscalationFloor` in the triage service forces `escalate: true` for security-incident language, privacy/data-export language (or a privacy category), and enterprise tickets that describe an outage or SLA breach. The model can still set escalation when the floor does not. Assumption: a password-reset failure (T-1013) is account support, not a security incident, unless the message describes unauthorized access. The floor looks at the ticket text, not only the model's category, because the category string is not yet normalized.
+- Fix (and why this layer): `enforceEscalationFloor` in the triage service forces `escalate: true` for security-incident language, privacy/data-export language (or a privacy category), and enterprise tickets that describe an outage or SLA breach. The model can still set escalation when the floor does not. Assumption: a password-reset failure (T-1013) is account support, not a security incident, unless the message describes unauthorized access. The floor checks ticket text independently of the already-normalized model category so category drift cannot suppress a mandatory escalation.
 - Verification (test name or manual steps): `tests/escalation.test.ts`.
 - Commit: dd137a8
 
@@ -206,7 +206,7 @@
 - Root cause: The incident expression treated `signed in` as sufficient evidence without unauthorized, suspicious, or customer-denial context.
 - Fix (and why this layer): Removed the ambiguous standalone phrase while retaining explicit unauthorized-access and suspicious-login indicators. The escalation floor owns deterministic incident detection.
 - Verification (test name or manual steps): `tests/businessPolicy.test.ts`; T-1004’s unauthorized-login regression still passes, as do the full suite and production build.
-- Commit: (this commit)
+- Commit: b6c2e42
 
 ## Found but not fixed
 

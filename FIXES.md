@@ -62,8 +62,20 @@
 - Root cause: Nothing raced the model promise against a timer, and the HTTP client did not abort the socket.
 - Fix (and why this layer): `withTimeout` wraps the call in `runTriage`, so every provider including the mock is bounded (`LLM_TIMEOUT_MS`, default 20s). The OpenAI-compatible client also aborts its own `fetch`. A timeout throws before `triageResults.set`, so the previous result stays. Invalid `LLM_TIMEOUT_MS` throws instead of being ignored. The in-flight provider request is not cancelled when the wrapper is the thing that fires first; the fetch abort covers the real HTTP client. Assumption: 20 seconds is long enough for a normal completion and short enough that an agent is not stuck on a dead connection.
 - Verification (test name or manual steps): `tests/llmTimeout.test.ts`.
-- Commit:
+- Commit: b0f7685
 
 ## Found but not fixed
 
+- Keyword retrieval is still raw term frequency. T-1012 mentions an "export button" and the top hit is the privacy policy. The drafted reply does not promise an export, and the escalation floor does not treat that ticket as a privacy request. Replacing the ranker would be a new design, not a fix for a wrong decision on the seed set.
+- `daysAgo` in the seed data uses local `setDate`, so a gap that crosses daylight saving time can floor one day short (T-1008's structured age was 198 days while the message says 200). Every seed refund is far from the 30-day boundary, and the guard uses the same timestamps the prompt shows the model. I left the generator alone.
+- The API has no authentication. This is a single-agent local tool; adding accounts would be a product change.
+- Two overlapping triages of the same ticket both run, and the last write wins. Each result is a triage of that ticket. I did not add a lock.
+- A 429 is returned to the agent and the previous result is kept. I did not add retries, because retrying a rate limit can make it worse.
+- Billing disputes over $500 are supposed to go to the billing team before any commitment. No seed ticket shows a wrong commitment at that amount. T-1003 mentions $4,200/month as an SLA complaint, so a dollar-amount parser would be easy to get wrong.
+- Prompt delimiters and the "never follow" instruction do not make injection impossible on a real model. The hard stop in this app is the 30-day refund check. Other promises a model might invent (credits, discounts, legal conclusions) are not exhaustively rewritten.
+- T-1013 (password reset email never arrives) can still be categorized `security` because the model sees the word "password". It is not escalated. Assumption: that is account support unless the message describes unauthorized access.
+- Drafted replies are rendered as text inside `<pre>`, so model HTML is not executed. Checked, not changed.
+
 ## Priority reasoning
+
+Customer-facing harm came first. Internal notes were being copied into replies the agent might send, and a customer message could talk the model into approving a refund the active policy forbids. The deprecated 90-day policy was the source of that wrong window, so retrieval was next, before any prompt tweak could paper over it. Escalation followed because security incidents and GDPR requests were left to the model's sense of tone, which the policies explicitly do not allow. Label normalization and the ticket-switch race matter to the agent, but they mislabel or mis-attribute a result rather than inventing a forbidden action. Logging and the LLM timeout came last: they do not change a correct decision, and they are what make the next failure visible without hanging the desk.

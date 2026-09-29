@@ -34,4 +34,14 @@ describe('searchPolicies', () => {
     const results = searchPolicies('zzz qqq xyzzy', policies);
     expect(results).toEqual([]);
   });
+
+  it('excludes deprecated and internal policies and ranks the active refund policy first', () => {
+    const results = searchPolicies('I want a refund within 90 days of purchase', policies, 10);
+    expect(results.map((r) => r.doc.id)).not.toContain('policy-refund-v2');
+    expect(results.map((r) => r.doc.id)).not.toContain('policy-internal-playbook');
+    expect(results[0]?.doc.id).toBe('policy-refund-v3');
+    expect(results.every((r) => r.doc.status === 'active' && r.doc.audience === 'public')).toBe(
+      true
+    );
+  });
 });

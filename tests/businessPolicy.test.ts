@@ -30,6 +30,21 @@ describe('deterministic business policy', () => {
     expect(result.urgency).toBe('high');
   });
 
+  it('does not escalate an ordinary signed-in navigation problem as a security incident', async () => {
+    const ticket: Ticket = {
+      ...getTicket('T-1013')!,
+      id: 'T-ACCOUNT-NAV',
+      subject: 'Cannot find settings',
+      message: 'After I signed in, I could not find the account settings page.',
+      internalNotes: [],
+    };
+    setLLMClient(lowRiskClient);
+
+    const result = await runTriage(ticket);
+    expect(result.escalate).toBe(false);
+    expect(result.urgency).toBe('low');
+  });
+
   it('escalates a billing dispute over $500 even when the model declines', async () => {
     const ticket: Ticket = {
       ...getTicket('T-1006')!,

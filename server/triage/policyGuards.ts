@@ -2,7 +2,7 @@ import type { PolicyDoc, Ticket } from '../../shared/types';
 import type { ParsedTriage } from './parser';
 
 const SECURITY_INCIDENT =
-  /unauthorized|wasn'?t me|was not me|signed in|suspicious (?:sign-?in|login)|credential compromise|account (?:was )?hacked/i;
+  /unauthorized|wasn'?t me|was not me|suspicious (?:sign-?in|login)|credential compromise|account (?:was )?hacked/i;
 
 const PRIVACY_REQUEST =
   /\bgdpr\b|\bccpa\b|personal data|data export|delete(?: my| all)? (?:my )?data|right to (?:access|erasure|be forgotten)/i;

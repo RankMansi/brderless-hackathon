@@ -198,6 +198,14 @@
 - Root cause: The deterministic guard enforced only the escalation bit, leaving contradictory model-generated reply text intact.
 - Fix (and why this layer): The grounded-reply policy guard now replaces privacy-request drafts with an acknowledgement that routes identity verification and fulfilment to the privacy team. The business-policy layer must keep both routing metadata and customer-facing commitments consistent.
 - Verification (test name or manual steps): `tests/businessPolicy.test.ts`; full suite and production build passed.
+- Commit: c37c6a3
+
+### 26. Ordinary sign-in text triggered security escalation  [priority: med]
+- Symptom: A routine message such as “After I signed in, I could not find settings” was forced to high urgency and escalated as a security incident.
+- Reproduction: Triage a non-security account-navigation ticket containing the bare phrase “signed in.” Before the fix the deterministic escalation matcher classified it as a security incident.
+- Root cause: The incident expression treated `signed in` as sufficient evidence without unauthorized, suspicious, or customer-denial context.
+- Fix (and why this layer): Removed the ambiguous standalone phrase while retaining explicit unauthorized-access and suspicious-login indicators. The escalation floor owns deterministic incident detection.
+- Verification (test name or manual steps): `tests/businessPolicy.test.ts`; T-1004’s unauthorized-login regression still passes, as do the full suite and production build.
 - Commit: (this commit)
 
 ## Found but not fixed

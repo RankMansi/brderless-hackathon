@@ -1,6 +1,45 @@
 import type { Ticket } from '../../shared/types';
 import type { ParsedTriage } from './parser';
 
+const SECURITY_INCIDENT =
+  /unauthorized|wasn'?t me|was not me|signed in|suspicious (?:sign-?in|login)|credential compromise|account (?:was )?hacked/i;
+
+const PRIVACY_REQUEST =
+  /\bgdpr\b|\bccpa\b|personal data|data export|delete(?: my| all)? (?:my )?data|right to (?:access|erasure|be forgotten)/i;
+
+const SLA_BREACH = /outage|\buptime\b|\bsla\b|service credit|dashboard down/i;
+
+/**
+ * Policies require escalation for security incidents, privacy requests, and
+ * enterprise SLA breaches. The model may raise this floor, not lower it.
+ * Password-reset friction is not treated as a security incident.
+ */
+export function escalationRequired(ticket: Ticket, category: string): string | null {
+  const text = `${ticket.subject}\n${ticket.message}`;
+  if (SECURITY_INCIDENT.test(text)) return 'security incident';
+  if (PRIVACY_REQUEST.test(text)) return 'privacy request';
+
+  const cat = category.trim().toLowerCase();
+  if (cat === 'privacy' || cat === 'data_request') return 'privacy request';
+  if (
+    ticket.customer.plan === 'enterprise' &&
+    (SLA_BREACH.test(text) || cat === 'outage' || cat === 'incident')
+  ) {
+    return 'enterprise SLA breach';
+  }
+  return null;
+}
+
+export function enforceEscalationFloor(ticket: Ticket, parsed: ParsedTriage): ParsedTriage {
+  const reason = escalationRequired(ticket, parsed.category);
+  if (!reason || parsed.escalate) return parsed;
+  return {
+    ...parsed,
+    escalate: true,
+    reasoning: `${parsed.reasoning} Policy guard: escalation is required (${reason}) and cannot be lowered by the model.`,
+  };
+}
+
 /** Matches the active refund policy (policy-refund-v3), not the deprecated 90-day text. */
 export const REFUND_WINDOW_DAYS = 30;
 

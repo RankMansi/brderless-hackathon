@@ -22,14 +22,14 @@
 - Root cause: `searchPolicies` ranked by raw term frequency and never read `status` or `audience`. The deprecated refund doc is longer and says "refund" more often, so it always won. The same hits are inserted into the prompt, so the model repeated the 90-day rule.
 - Fix (and why this layer): Filter to `status === 'active'` and `audience === 'public'` before scoring, in `searchPolicies`. A score penalty would still let a long deprecated doc win. Assumption: this retrieval path is customer-facing context, so internal playbooks stay out of it; agents still see internal notes on the ticket. Deprecated docs remain in the corpus and on `GET /api/policies`.
 - Verification (test name or manual steps): `tests/policySearch.test.ts` ("excludes deprecated and internal policies…") and `tests/refundPolicy.test.ts` (T-1001, T-1002, T-1010).
-- Commit:
+- Commit: 72439b2
 
 ### 4. Escalation ignored mandatory policy rules  [priority: high]
-- Symptom:
-- Reproduction:
-- Root cause:
-- Fix (and why this layer):
-- Verification (test name or manual steps):
+- Symptom: T-1004 (unauthorized sign-ins from Jakarta and Lagos, calmly worded "No rush, just curious") was not escalated. T-1007 (GDPR export) was not escalated. A model can also return `escalate: false` for an enterprise outage (T-1003). Security, privacy, and enterprise SLA policies all require escalation regardless of tone.
+- Reproduction: `POST /api/tickets/T-1004/triage` and `POST /api/tickets/T-1007/triage` returned `escalate: false`. A stand-in model that returns `escalate: false` for T-1003 was stored as-is.
+- Root cause: `runTriage` copied `escalate` from the model. The mock (and a typical model) judges tone: loud complaints escalate, calm ones do not. The policies are not tone-based.
+- Fix (and why this layer): `enforceEscalationFloor` in the triage service forces `escalate: true` for security-incident language, privacy/data-export language (or a privacy category), and enterprise tickets that describe an outage or SLA breach. The model can still set escalation when the floor does not. Assumption: a password-reset failure (T-1013) is account support, not a security incident, unless the message describes unauthorized access. The floor looks at the ticket text, not only the model's category, because the category string is not yet normalized.
+- Verification (test name or manual steps): `tests/escalation.test.ts`.
 - Commit:
 
 ### 5. Model label drift broke urgency filters and badges  [priority: med]

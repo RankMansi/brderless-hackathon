@@ -118,11 +118,18 @@
 - Root cause: The route cast every thrown value to `Error` and sent `.message` directly.
 - Fix (and why this layer): The route now maps service/provider errors to bounded public messages and meaningful 502/503/504 statuses, while unexpected errors remain a generic 500. Detailed context remains in the redacted server log. Translating internal failures into an HTTP contract belongs at the route boundary.
 - Verification (test name or manual steps): `tests/httpErrors.test.ts`.
+- Commit: 02e5dcb
+
+### 16. Weak substring retrieval attached unrelated policies  [priority: med]
+- Symptom: T-1011 (API rate limits) cited refund, SLA, and security policies; T-1012 (dashboard praise mentioning an export button) cited the data-privacy policy; T-1014 (invoice PO number) cited cancellation, billing-dispute, and SLA policies. These citations falsely implied that the draft was grounded in applicable documentation.
+- Reproduction: Run `searchPolicies` for every seed ticket. Before the fix T-1011 returned three unrelated docs, T-1012 returned privacy, and T-1014 returned three unrelated docs. Equal-score ties also depended on corpus order.
+- Root cause: Scoring counted substring frequency, including repeated query terms and matches inside other words, accepted a single weak overlap, and had no explicit tie-break.
+- Fix (and why this layer): Retrieval now compares unique normalized tokens, handles common plurals/label variants, ignores low-signal support vocabulary, requires policy-specific intent (or multiple matches including a title match), weights title matches, and breaks ties by newest policy date then id. No-match is now preferred over misleading context. This is implemented in retrieval so prompts, citations, and every caller receive the same ranked set.
+- Verification (test name or manual steps): `tests/retrievalQuality.test.ts` covers applicable seed policies, no-match seed tickets, plurals/variants, generic overlap, and ties; existing retrieval and triage suites remain green.
 - Commit: (this commit)
 
 ## Found but not fixed
 
-- Keyword retrieval is still raw term frequency. T-1012 mentions an "export button" and the top hit is the privacy policy. The drafted reply does not promise an export, and the escalation floor does not treat that ticket as a privacy request. Replacing the ranker would be a new design, not a fix for a wrong decision on the seed set.
 - `daysAgo` in the seed data uses local `setDate`, so a gap that crosses daylight saving time can floor one day short (T-1008's structured age was 198 days while the message says 200). Every seed refund is far from the 30-day boundary, and the guard uses the same timestamps the prompt shows the model. I left the generator alone.
 - The API has no authentication. This is a single-agent local tool; adding accounts would be a product change.
 - A 429 is returned to the agent and the previous result is kept. I did not add retries, because retrying a rate limit can make it worse.

@@ -86,8 +86,12 @@ export function getLLMClient(): LLMClient {
       apiKey,
       process.env.OPENAI_MODEL ?? 'gpt-4o-mini'
     );
-  } else {
+  } else if (provider === 'mock') {
     client = new MockLLM();
+  } else {
+    throw new Error(
+      `Unsupported LLM_PROVIDER=${provider}; expected "mock", "gemini", or "openai"`
+    );
   }
   return client;
 }

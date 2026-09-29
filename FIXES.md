@@ -64,6 +64,14 @@
 - Verification (test name or manual steps): `tests/llmTimeout.test.ts`.
 - Commit: b0f7685
 
+### 9. An invalid LLM provider silently enabled mock replies  [priority: high]
+- Symptom: Setting `LLM_PROVIDER=opneai` (or any unsupported value) did not report a configuration error. The app silently used `MockLLM`, so a production typo could generate deterministic fake replies while appearing healthy.
+- Reproduction: Set `LLM_PROVIDER=opneai`, reset the cached client, and call `getLLMClient()`. Before the fix it returned a `MockLLM`.
+- Root cause: `getLLMClient` used its final `else` branch for both `mock` and every unknown provider.
+- Fix (and why this layer): The client factory now selects `MockLLM` only for the explicit `mock` value and throws for every unsupported value. Provider selection belongs at the configuration boundary, before triage can run with the wrong backend.
+- Verification (test name or manual steps): `tests/llmProvider.test.ts`.
+- Commit: (this commit)
+
 ## Found but not fixed
 
 - Keyword retrieval is still raw term frequency. T-1012 mentions an "export button" and the top hit is the privacy policy. The drafted reply does not promise an export, and the escalation floor does not treat that ticket as a privacy request. Replacing the ranker would be a new design, not a fix for a wrong decision on the seed set.

@@ -10,5 +10,3 @@ app.listen(port, () => {
   console.log(`HelpDesk Copilot API listening on http://localhost:${port}`);
   console.log(`LLM provider: ${process.env.LLM_PROVIDER ?? 'mock'}`);
 });
-
-export { app };

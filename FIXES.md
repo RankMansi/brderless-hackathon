@@ -166,6 +166,14 @@
 - Root cause: Components represented async states with empty arrays/null and relied on click handlers on non-interactive elements. Navigation and content-boundary labels were omitted from the original minimal UI.
 - Fix (and why this layer): Ticket rows are real buttons with focus/current semantics; the app has previous/next controls, loading/no-match states, responsive one-column behavior, and retry actions for list and detail failures. Triage uses live/error regions, explicitly labels the customer draft and internal reasoning, and explains no-policy results. These are presentation and interaction concerns, so no API behavior changed.
 - Verification (test name or manual steps): `tests/ticketNavigation.test.ts`. Manual: navigate ticket rows and previous/next controls by keyboard; filter to an empty urgency and see the no-match message; stop/restart the API and use Retry; open T-1012 and see “No applicable policy”; resize below 760px and confirm the list stacks above details.
+- Commit: cb6dda6
+
+### 22. Verified dead exports and duplicate reply assembly  [priority: low]
+- Symptom: Retrieval retained an exported `scoreDoc` that no caller used after the ranking rewrite; internal prompt/policy helpers and the Express app were exported without consumers; policy guards repeated the same six-line reply envelope in seven branches.
+- Reproduction: `tsc --noEmit --noUnusedLocals --noUnusedParameters` was clean, then repository-wide symbol searches confirmed these exports had no imports and each repeated reply produced the same greeting/signature.
+- Root cause: The first pass evolved implementation details incrementally and left compatibility surface and duplicated construction behind.
+- Fix (and why this layer): Removed only verified-unused exports and the dead scoring wrapper, and consolidated identical policy reply formatting in one private helper. No data flow, strings, API routes, or model behavior changed.
+- Verification (test name or manual steps): Cleanup baseline: 86 tests passed and build succeeded. After cleanup: full `npm test`, `npm run build`, strict unused-symbol typecheck, and `git diff --check`.
 - Commit: (this commit)
 
 ## Found but not fixed

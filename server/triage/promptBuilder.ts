@@ -28,7 +28,7 @@ function daysBetween(from: string, to: string): number {
  * the UI; putting them in this prompt makes the model repeat them in the
  * drafted reply.
  */
-export function formatTicketContext(ticket: Ticket): string {
+function formatTicketContext(ticket: Ticket): string {
   const lines = [
     `Ticket ${ticket.id}: ${ticket.subject}`,
     `Customer: ${ticket.customer.name} (${ticket.customer.plan} plan, $${ticket.customer.monthlySpendUsd}/mo)`,
@@ -42,7 +42,7 @@ export function formatTicketContext(ticket: Ticket): string {
   return lines.join('\n');
 }
 
-export function formatPolicyContext(docs: PolicyDoc[]): string {
+function formatPolicyContext(docs: PolicyDoc[]): string {
   if (docs.length === 0) return 'Relevant policies:\nnone found';
   const sections = docs.map((d) => `### ${d.title}\n${d.body}`);
   return `Relevant policies:\n${sections.join('\n\n')}`;

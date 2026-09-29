@@ -18,6 +18,12 @@ function ticketText(ticket: Ticket): string {
   return `${ticket.subject}\n${ticket.message}`;
 }
 
+function supportReply(body: string): string {
+  return ['Hi, thanks for reaching out.', '', body, '', 'Best regards,', 'Support Team'].join(
+    '\n'
+  );
+}
+
 function hasBillingDisputeOverLimit(ticket: Ticket): boolean {
   const text = ticketText(ticket);
   if (!BILLING_DISPUTE.test(text)) return false;
@@ -52,7 +58,7 @@ export function enforceCategoryRules(ticket: Ticket, parsed: ParsedTriage): Pars
  * enterprise SLA breaches. The model may raise this floor, not lower it.
  * Password-reset friction is not treated as a security incident.
  */
-export function escalationRequired(ticket: Ticket, category: string): string | null {
+function escalationRequired(ticket: Ticket, category: string): string | null {
   const text = ticketText(ticket);
   if (SECURITY_INCIDENT.test(text)) return 'security incident';
   if (PRIVACY_REQUEST.test(text)) return 'privacy request';
@@ -101,14 +107,9 @@ export function enforceBillingReview(ticket: Ticket, parsed: ParsedTriage): Pars
   if (!hasBillingDisputeOverLimit(ticket)) return parsed;
   return {
     ...parsed,
-    reply: [
-      'Hi, thanks for reaching out.',
-      '',
-      'Because this dispute is over $500, our billing team must review the charge history before any commitment is made. A support agent will route it for specialist review and follow up after verification.',
-      '',
-      'Best regards,',
-      'Support Team',
-    ].join('\n'),
+    reply: supportReply(
+      'Because this dispute is over $500, our billing team must review the charge history before any commitment is made. A support agent will route it for specialist review and follow up after verification.'
+    ),
     reasoning: `${parsed.reasoning} Policy guard: billing disputes over $500 require billing-team review before any commitment.`,
   };
 }
@@ -131,14 +132,9 @@ export function enforceGroundedReply(
   ) {
     return {
       ...parsed,
-      reply: [
-        'Hi, thanks for reaching out.',
-        '',
-        `Based on the purchase date, your request is within our ${REFUND_WINDOW_DAYS}-day refund window and is eligible for processing. We have not yet started the refund; a support agent can verify the order and initiate it to the original payment method.`,
-        '',
-        'Best regards,',
-        'Support Team',
-      ].join('\n'),
+      reply: supportReply(
+        `Based on the purchase date, your request is within our ${REFUND_WINDOW_DAYS}-day refund window and is eligible for processing. We have not yet started the refund; a support agent can verify the order and initiate it to the original payment method.`
+      ),
       reasoning: `${parsed.reasoning} Policy guard: the draft cannot claim the refund was initiated because triage does not perform account actions.`,
     };
   }
@@ -149,14 +145,9 @@ export function enforceGroundedReply(
   ) {
     return {
       ...parsed,
-      reply: [
-        'Hi, thanks for reaching out.',
-        '',
-        'I’m sorry for the disruption. This report is a suspected SLA breach and needs immediate escalation to the enterprise success team. They will verify the incident duration, assess any service credits under the SLA, and coordinate the appropriate follow-up.',
-        '',
-        'Best regards,',
-        'Support Team',
-      ].join('\n'),
+      reply: supportReply(
+        'I’m sorry for the disruption. This report is a suspected SLA breach and needs immediate escalation to the enterprise success team. They will verify the incident duration, assess any service credits under the SLA, and coordinate the appropriate follow-up.'
+      ),
       reasoning: `${parsed.reasoning} Policy guard: the draft must not present a reported incident or service-credit decision as already verified.`,
     };
   }
@@ -171,14 +162,9 @@ export function enforceGroundedReply(
   if (asksAboutRetention && !hasRetentionPolicy) {
     return {
       ...parsed,
-      reply: [
-        'Hi, thanks for reaching out.',
-        '',
-        'You can cancel at any time, and access continues until the end of the current billing period. A pause of up to 3 months is also available as an alternative. The data-retention period is not specified in the available cancellation policy, so a support agent must confirm that detail before giving you a timeline.',
-        '',
-        'Best regards,',
-        'Support Team',
-      ].join('\n'),
+      reply: supportReply(
+        'You can cancel at any time, and access continues until the end of the current billing period. A pause of up to 3 months is also available as an alternative. The data-retention period is not specified in the available cancellation policy, so a support agent must confirm that detail before giving you a timeline.'
+      ),
       reasoning: `${parsed.reasoning} Policy guard: the available policy does not support a specific post-cancellation data-retention period.`,
     };
   }
@@ -195,7 +181,7 @@ const REFUND_DENIAL =
 const PURCHASE_DATE_VERIFICATION =
   /verify|confirm|need|provide|share|check/i;
 
-export function daysSincePurchase(ticket: Ticket): number | null {
+function daysSincePurchase(ticket: Ticket): number | null {
   if (!ticket.purchaseDate) return null;
   const ms = new Date(ticket.createdAt).getTime() - new Date(ticket.purchaseDate).getTime();
   if (Number.isNaN(ms) || ms < 0) return null;
@@ -221,14 +207,9 @@ export function enforceRefundWindow(ticket: Ticket, parsed: ParsedTriage): Parse
     }
     return {
       ...parsed,
-      reply: [
-        'Hi, thanks for reaching out.',
-        '',
-        'Before we can determine refund eligibility, we need to verify the purchase date for this order. Once confirmed, we can check it against our 30-day refund window.',
-        '',
-        'Best regards,',
-        'Support Team',
-      ].join('\n'),
+      reply: supportReply(
+        'Before we can determine refund eligibility, we need to verify the purchase date for this order. Once confirmed, we can check it against our 30-day refund window.'
+      ),
       reasoning: `${parsed.reasoning} Policy guard: refund eligibility cannot be confirmed without a valid purchase date.`,
     };
   }
@@ -238,14 +219,9 @@ export function enforceRefundWindow(ticket: Ticket, parsed: ParsedTriage): Parse
   if (hasLegalRefundException(ticket)) {
     return {
       ...parsed,
-      reply: [
-        'Hi, thanks for reaching out.',
-        '',
-        'Your request is outside our standard 30-day refund window, and you have raised a potential legal exception. A support agent must route it to a specialist for review before making an eligibility decision.',
-        '',
-        'Best regards,',
-        'Support Team',
-      ].join('\n'),
+      reply: supportReply(
+        'Your request is outside our standard 30-day refund window, and you have raised a potential legal exception. A support agent must route it to a specialist for review before making an eligibility decision.'
+      ),
       reasoning: `${parsed.reasoning} Policy guard: a claimed legal exception requires specialist review rather than an automatic approval or denial.`,
     };
   }
@@ -254,14 +230,9 @@ export function enforceRefundWindow(ticket: Ticket, parsed: ParsedTriage): Parse
 
   return {
     ...parsed,
-    reply: [
-      'Hi, thanks for reaching out.',
-      '',
-      `Unfortunately your purchase was ${days} days ago, which is outside our ${REFUND_WINDOW_DAYS}-day refund window, so we are unable to process a refund. As an alternative, we can offer account credit.`,
-      '',
-      'Best regards,',
-      'Support Team',
-    ].join('\n'),
+    reply: supportReply(
+      `Unfortunately your purchase was ${days} days ago, which is outside our ${REFUND_WINDOW_DAYS}-day refund window, so we are unable to process a refund. As an alternative, we can offer account credit.`
+    ),
     reasoning: `${parsed.reasoning} Policy guard: the draft approved a refund, but the purchase is outside the ${REFUND_WINDOW_DAYS}-day window required by policy-refund-v3, so the reply was replaced with a denial.`,
   };
 }

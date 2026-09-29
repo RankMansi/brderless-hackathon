@@ -20,10 +20,6 @@ export function tokenize(text: string): string[] {
     .filter((t) => t.length > 2 && !STOPWORDS.has(t));
 }
 
-export function scoreDoc(queryTerms: string[], doc: PolicyDoc): number {
-  return scoreDetails(queryTerms, doc).score;
-}
-
 function normalizeTerm(term: string): string {
   const aliases: Record<string, string> = {
     billed: 'billing',

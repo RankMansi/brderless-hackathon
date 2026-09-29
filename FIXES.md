@@ -102,6 +102,14 @@
 - Root cause: JSON extraction used `indexOf('{')`/`lastIndexOf('}')`, and field validation coerced arbitrary values with `String(...)`.
 - Fix (and why this layer): The parser now scans balanced JSON-object candidates while respecting quoted strings and accepts the first candidate that actually parses. It validates reply and reasoning types before returning the closed boundary object. Model formatting drift and value types belong at this boundary, not in the UI.
 - Verification (test name or manual steps): `tests/parserRobustness.test.ts`, plus `tests/parser.test.ts`.
+- Commit: e0ad83b
+
+### 14. Observability logs copied customer content and drafted replies  [priority: high]
+- Symptom: Every triage log contained the full customer name, plan/spend metadata, message, generated reply, and reasoning. Centralized production logs therefore became a second store of support-ticket data.
+- Reproduction: Triage T-1002 and inspect the JSON log. Before the fix it contained `Marcus Chen`, `money is tight`, and the complete customer-facing reply.
+- Root cause: The first observability fix serialized the full prompt and raw model output. Those fields were useful for debugging but were not safe defaults for durable logs.
+- Fix (and why this layer): The triage service now keeps retrieval ids/scores, final classification, and prompt structure while replacing the untrusted customer block and model text values with explicit redaction markers. The logged query is limited to the subject. Redaction is applied at the logging boundary so model behavior and stored results do not change.
+- Verification (test name or manual steps): `tests/triageLogPrivacy.test.ts`; the existing `tests/triageLog.test.ts` still proves the diagnostic fields and policy scores exist.
 - Commit: (this commit)
 
 ## Found but not fixed

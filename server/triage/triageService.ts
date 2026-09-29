@@ -9,6 +9,15 @@ import { getLLMClient } from '../llm/client';
 import { llmTimeoutMs, withTimeout } from '../llm/timeout';
 
 const inFlight = new Map<string, Promise<TriageResult>>();
+const CUSTOMER_BLOCK =
+  /<<<UNTRUSTED CUSTOMER TICKET>>>[\s\S]*?<<<END UNTRUSTED CUSTOMER TICKET>>>/;
+
+function promptForLog(prompt: string): string {
+  return prompt.replace(
+    CUSTOMER_BLOCK,
+    '<<<UNTRUSTED CUSTOMER TICKET>>>\n[REDACTED CUSTOMER TICKET]\n<<<END UNTRUSTED CUSTOMER TICKET>>>'
+  );
+}
 
 export function runTriage(ticket: Ticket): Promise<TriageResult> {
   const existing = inFlight.get(ticket.id);
@@ -76,10 +85,16 @@ async function runTriageOnce(ticket: Ticket): Promise<TriageResult> {
       JSON.stringify({
         event: 'triage',
         ticketId: ticket.id,
-        query,
+        query: ticket.subject,
         retrieved: retrievedLog,
-        prompt,
-        raw,
+        prompt: promptForLog(prompt),
+        raw: JSON.stringify({
+          category: result.category,
+          urgency: result.urgency,
+          escalate: result.escalate,
+          reply: '[REDACTED]',
+          reasoning: '[REDACTED]',
+        }),
         category: result.category,
         urgency: result.urgency,
         escalate: result.escalate,
@@ -93,10 +108,10 @@ async function runTriageOnce(ticket: Ticket): Promise<TriageResult> {
       JSON.stringify({
         event: 'triage_error',
         ticketId: ticket.id,
-        query,
+        query: ticket.subject,
         retrieved: retrievedLog,
-        prompt,
-        raw,
+        prompt: promptForLog(prompt),
+        raw: raw ? '[REDACTED MODEL OUTPUT]' : '',
         error: err instanceof Error ? err.message : String(err),
       })
     );

@@ -182,6 +182,14 @@
 - Root cause: The guard trusted any denial-like substring, keyed only on customer wording, and reused an alternative from the deprecated refund policy.
 - Fix (and why this layer): Outside-window refund replies are now always replaced with a deterministic active-policy denial, refund category also activates the guard, and the unsupported credit offer was removed. Eligibility enforcement belongs in the deterministic policy layer rather than model prompting.
 - Verification (test name or manual steps): `tests/refundGuardCoverage.test.ts`; full suite 88 tests passed and production build succeeded.
+- Commit: 5f08b05
+
+### 24. Partial internal-note identifiers could reach customer drafts  [priority: high]
+- Symptom: The store boundary rejected a complete copied internal note but allowed sensitive fragments such as `INC-4432` or `Fraud risk score: 87`.
+- Reproduction: Return either fragment in a model reply without the rest of its source note. Before the fix `findLeakedInternalNote` returned null and the unmodified fragment could be stored.
+- Root cause: Leak detection compared only the complete normalized note and skipped shorter excerpts.
+- Fix (and why this layer): The store-boundary safety check now also detects meaningful sentence fragments and structured internal identifiers. This remains the last line of defense regardless of how a provider obtained or reconstructed the text.
+- Verification (test name or manual steps): `tests/internalNotes.test.ts`; full suite and production build passed.
 - Commit: (this commit)
 
 ## Found but not fixed

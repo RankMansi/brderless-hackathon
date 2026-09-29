@@ -78,6 +78,14 @@
 - Root cause: The API helper discarded response status and `TicketView` treated every rejection as “no triage result yet.” Ticket-detail errors were converted back to `ticket = null`, which was also the loading sentinel.
 - Fix (and why this layer): `src/api.ts` now throws `ApiError` with the HTTP status. `TicketView` generates only for a 404 and shows all other triage errors. It tracks ticket-load errors separately so the detail pane can distinguish failure from loading.
 - Verification (test name or manual steps): `tests/apiErrors.test.ts`. Manual: return 500 from the triage GET and verify no POST is sent and the error banner is shown; stop the API and select a ticket, then verify “Could not load ticket” replaces the indefinite loading message.
+- Commit: b9d73cb
+
+### 11. The refund guard depended on a short approval phrase list  [priority: high]
+- Symptom: An out-of-window refund was blocked only when the model used one of three phrases such as “refund has been approved.” Equivalent language such as “You are eligible, and we can return your payment” bypassed the guard. A refund with no purchase date could also be approved because the guard returned early.
+- Reproduction: Pass T-1008 and a parsed draft containing “You are eligible, and we can return your payment” to `enforceRefundWindow`; before the fix the permissive reply was unchanged. Remove `purchaseDate` from T-1001 and the same approval was also unchanged.
+- Root cause: The deterministic rule tried to enumerate approval wording rather than enforce the policy outcome for refund-request tickets.
+- Fix (and why this layer): The policy guard now identifies refund requests from the ticket. For purchases older than 30 days, any reply that does not already clearly deny eligibility is replaced with the policy denial. When the purchase date is absent or invalid, the reply requires verification instead of deciding eligibility. Non-refund tickets and clear existing denials are unchanged.
+- Verification (test name or manual steps): `tests/refundGuardCoverage.test.ts`, plus the existing refund and injection suites.
 - Commit: (this commit)
 
 ## Found but not fixed

@@ -43,13 +43,16 @@ export function enforceEscalationFloor(ticket: Ticket, parsed: ParsedTriage): Pa
 /** Matches the active refund policy (policy-refund-v3), not the deprecated 90-day text. */
 export const REFUND_WINDOW_DAYS = 30;
 
-const REFUND_APPROVAL =
-  /refund has been approved|started the refund|no manager approval is required/i;
+const REFUND_REQUEST = /\brefund\b|money back/i;
+const REFUND_DENIAL =
+  /outside (?:our |the )?\d+-day refund window|not eligible|unable to (?:process|approve)|cannot (?:process|approve)|can't (?:process|approve)/i;
+const PURCHASE_DATE_VERIFICATION =
+  /verify|confirm|need|provide|share|check/i;
 
 export function daysSincePurchase(ticket: Ticket): number | null {
   if (!ticket.purchaseDate) return null;
   const ms = new Date(ticket.createdAt).getTime() - new Date(ticket.purchaseDate).getTime();
-  if (Number.isNaN(ms)) return null;
+  if (Number.isNaN(ms) || ms < 0) return null;
   return Math.floor(ms / (1000 * 60 * 60 * 24));
 }
 
@@ -59,9 +62,32 @@ export function daysSincePurchase(ticket: Ticket): number | null {
  * anything is stored.
  */
 export function enforceRefundWindow(ticket: Ticket, parsed: ParsedTriage): ParsedTriage {
+  const text = `${ticket.subject}\n${ticket.message}`;
+  if (!REFUND_REQUEST.test(text)) return parsed;
+
   const days = daysSincePurchase(ticket);
-  if (days === null || days <= REFUND_WINDOW_DAYS) return parsed;
-  if (!REFUND_APPROVAL.test(parsed.reply)) return parsed;
+  if (days === null) {
+    if (
+      /purchase date/i.test(parsed.reply) &&
+      PURCHASE_DATE_VERIFICATION.test(parsed.reply)
+    ) {
+      return parsed;
+    }
+    return {
+      ...parsed,
+      reply: [
+        'Hi, thanks for reaching out.',
+        '',
+        'Before we can determine refund eligibility, we need to verify the purchase date for this order. Once confirmed, we can check it against our 30-day refund window.',
+        '',
+        'Best regards,',
+        'Support Team',
+      ].join('\n'),
+      reasoning: `${parsed.reasoning} Policy guard: refund eligibility cannot be confirmed without a valid purchase date.`,
+    };
+  }
+
+  if (days <= REFUND_WINDOW_DAYS || REFUND_DENIAL.test(parsed.reply)) return parsed;
 
   return {
     ...parsed,

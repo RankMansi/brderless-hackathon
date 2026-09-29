@@ -3,6 +3,7 @@ import { runTriage } from '../server/triage/triageService';
 import { db, getTicket } from '../server/store';
 import { setLLMClient, type LLMClient } from '../server/llm/client';
 import { MockLLM } from '../server/llm/mock';
+import { llmTimeoutMs } from '../server/llm/timeout';
 
 describe('LLM failure handling', () => {
   beforeEach(() => {
@@ -41,4 +42,12 @@ describe('LLM failure handling', () => {
     await expect(runTriage(ticket)).rejects.toThrow(/timed out after 40ms/);
     expect(db.triageResults.get(ticket.id)).toEqual(stored);
   }, 1500);
+
+  it.each(['not-a-number', '0', '-10'])(
+    'rejects invalid LLM timeout configuration: %s',
+    (configured) => {
+      process.env.LLM_TIMEOUT_MS = configured;
+      expect(() => llmTimeoutMs()).toThrow(/must be a positive number/i);
+    }
+  );
 });

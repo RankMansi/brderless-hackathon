@@ -174,7 +174,7 @@
 - Root cause: The first pass evolved implementation details incrementally and left compatibility surface and duplicated construction behind.
 - Fix (and why this layer): Removed only verified-unused exports and the dead scoring wrapper, and consolidated identical policy reply formatting in one private helper. No data flow, strings, API routes, or model behavior changed.
 - Verification (test name or manual steps): Cleanup baseline: 86 tests passed and build succeeded. After cleanup: full `npm test`, `npm run build`, strict unused-symbol typecheck, and `git diff --check`.
-- Commit: (this commit)
+- Commit: f6039b3
 
 ## Found but not fixed
 

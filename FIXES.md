@@ -190,6 +190,14 @@
 - Root cause: Leak detection compared only the complete normalized note and skipped shorter excerpts.
 - Fix (and why this layer): The store-boundary safety check now also detects meaningful sentence fragments and structured internal identifiers. This remains the last line of defense regardless of how a provider obtained or reconstructed the text.
 - Verification (test name or manual steps): `tests/internalNotes.test.ts`; full suite and production build passed.
+- Commit: b47bfad
+
+### 25. Privacy drafts promised direct fulfilment by support  [priority: high]
+- Symptom: Data-export tickets were escalated, but the customer draft said “we will verify” and “provide a complete export,” implying that the support agent would fulfil a request the policy reserves for the privacy team.
+- Reproduction: Run triage for T-1007. Before the fix the draft omitted the privacy team and promised support-side fulfilment.
+- Root cause: The deterministic guard enforced only the escalation bit, leaving contradictory model-generated reply text intact.
+- Fix (and why this layer): The grounded-reply policy guard now replaces privacy-request drafts with an acknowledgement that routes identity verification and fulfilment to the privacy team. The business-policy layer must keep both routing metadata and customer-facing commitments consistent.
+- Verification (test name or manual steps): `tests/businessPolicy.test.ts`; full suite and production build passed.
 - Commit: (this commit)
 
 ## Found but not fixed

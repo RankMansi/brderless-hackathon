@@ -122,6 +122,16 @@ export function enforceGroundedReply(
   const text = ticketText(ticket);
   const days = daysSincePurchase(ticket);
 
+  if (PRIVACY_REQUEST.test(text)) {
+    return {
+      ...parsed,
+      reply: supportReply(
+        'We have received your request and will route it to our privacy team. The privacy team will verify your identity against the account email and handle the export within 30 days. Support agents cannot fulfil data requests directly.'
+      ),
+      reasoning: `${parsed.reasoning} Policy guard: privacy requests must be routed to the privacy team rather than fulfilled directly by support.`,
+    };
+  }
+
   if (
     REFUND_REQUEST.test(text) &&
     days !== null &&

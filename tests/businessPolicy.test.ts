@@ -61,4 +61,12 @@ describe('deterministic business policy', () => {
     expect(result.reply).toMatch(/specialist.*review|legal review/i);
     expect(result.reply).not.toMatch(/unable to process a refund/i);
   });
+
+  it('routes data exports to the privacy team without promising support fulfilment', async () => {
+    const result = await runTriage(getTicket('T-1007')!);
+
+    expect(result.escalate).toBe(true);
+    expect(result.reply).toMatch(/privacy team/i);
+    expect(result.reply).not.toMatch(/we will.*provide.*(?:complete |full )?export/is);
+  });
 });

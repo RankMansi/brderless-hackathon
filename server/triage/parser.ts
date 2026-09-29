@@ -40,18 +40,7 @@ const URGENCY_SYNONYMS: Record<string, Urgency> = {
  * urgency sets; the UI filters and badge classes compare those strings exactly.
  */
 export function parseTriageResponse(raw: string): ParsedTriage {
-  const start = raw.indexOf('{');
-  const end = raw.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error('No JSON object found in model response');
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw.slice(start, end + 1));
-  } catch {
-    throw new Error('Model response contained malformed JSON');
-  }
+  const parsed = extractJsonObject(raw);
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error('Model response JSON must be an object');
   }
@@ -63,18 +52,60 @@ export function parseTriageResponse(raw: string): ParsedTriage {
     }
   }
 
-  const reply = String(record.reply);
-  if (!reply.trim()) {
-    throw new Error('Model response missing field: reply');
+  if (typeof record.reply !== 'string' || !record.reply.trim()) {
+    throw new Error('Model response reply must be a non-empty string');
+  }
+  if (record.reasoning !== undefined && typeof record.reasoning !== 'string') {
+    throw new Error('Model response reasoning must be a string');
   }
 
   return {
     category: normalizeCategory(record.category),
     urgency: normalizeUrgency(record.urgency),
     escalate: parseEscalate(record.escalate),
-    reply,
-    reasoning: String(record.reasoning ?? ''),
+    reply: record.reply,
+    reasoning: record.reasoning ?? '',
   };
+}
+
+function extractJsonObject(raw: string): unknown {
+  let foundObjectDelimiter = false;
+
+  for (let start = raw.indexOf('{'); start !== -1; start = raw.indexOf('{', start + 1)) {
+    foundObjectDelimiter = true;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = start; index < raw.length; index += 1) {
+      const char = raw[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === '\\') escaped = true;
+        else if (char === '"') inString = false;
+        continue;
+      }
+      if (char === '"') {
+        inString = true;
+      } else if (char === '{') {
+        depth += 1;
+      } else if (char === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          try {
+            return JSON.parse(raw.slice(start, index + 1));
+          } catch {
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  if (foundObjectDelimiter) {
+    throw new Error('Model response contained malformed JSON');
+  }
+  throw new Error('No JSON object found in model response');
 }
 
 function normalizeCategory(value: unknown): Category {

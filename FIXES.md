@@ -94,6 +94,14 @@
 - Root cause: The triage service had no per-ticket in-flight coordination; the disabled UI button did not protect API callers or two browser sessions.
 - Fix (and why this layer): `runTriage` now keeps one in-flight promise per ticket and returns it to concurrent callers. The entry is removed in `finally`, so a later explicit regeneration still makes a fresh model call. Coordination belongs in the service because every route and caller passes through it.
 - Verification (test name or manual steps): `tests/triageConcurrency.test.ts`.
+- Commit: 91a6c8b
+
+### 13. Valid model JSON failed when surrounding prose contained braces  [priority: med]
+- Symptom: The parser rejected an otherwise valid result if the model wrote brace-delimited prose before or after it, because it sliced from the first `{` in the response to the final `}`. It also accepted `reply: null` as the visible text `"null"` and object-valued reasoning as `"[object Object]"`.
+- Reproduction: Parse `Use {carefully}...\n<valid payload>\nSee {manual}.`; before the fix it threw “malformed JSON.” Parse a payload with `reply: null`; it returned a non-empty `"null"` reply.
+- Root cause: JSON extraction used `indexOf('{')`/`lastIndexOf('}')`, and field validation coerced arbitrary values with `String(...)`.
+- Fix (and why this layer): The parser now scans balanced JSON-object candidates while respecting quoted strings and accepts the first candidate that actually parses. It validates reply and reasoning types before returning the closed boundary object. Model formatting drift and value types belong at this boundary, not in the UI.
+- Verification (test name or manual steps): `tests/parserRobustness.test.ts`, plus `tests/parser.test.ts`.
 - Commit: (this commit)
 
 ## Found but not fixed

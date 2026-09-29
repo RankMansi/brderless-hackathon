@@ -158,6 +158,14 @@
 - Root cause: Request generation was checked only when applying the final result, not before starting the fallback mutation, and the effect had no cleanup invalidation.
 - Fix (and why this layer): The view now checks request generation before POSTing and invalidates the generation in effect cleanup. The existing result/ticket-id guard remains in place. This belongs in the client lifecycle because the server cannot know whether a browser has changed selection.
 - Verification (test name or manual steps): `tests/triageRequestState.test.ts` and `tests/triageFreshness.test.ts`. Manual: with a delayed triage GET, switch tickets before the 404 and confirm no POST is sent for the abandoned selection.
+- Commit: eb9e5db
+
+### 21. Ticket navigation and operational states were incomplete  [priority: med]
+- Symptom: Ticket rows were mouse-only `<li>` elements, there were no previous/next controls, an empty filter rendered a blank list, initial list loading looked like “0 tickets,” and failed list/ticket loads had no usable retry. The triage panel also showed an empty policy list with no explanation and did not clearly label customer-facing versus internal text.
+- Reproduction: Tab through the ticket list (rows could not receive focus), choose an urgency with no matches, stop the API during initial load, and view an uncited ticket such as T-1012.
+- Root cause: Components represented async states with empty arrays/null and relied on click handlers on non-interactive elements. Navigation and content-boundary labels were omitted from the original minimal UI.
+- Fix (and why this layer): Ticket rows are real buttons with focus/current semantics; the app has previous/next controls, loading/no-match states, responsive one-column behavior, and retry actions for list and detail failures. Triage uses live/error regions, explicitly labels the customer draft and internal reasoning, and explains no-policy results. These are presentation and interaction concerns, so no API behavior changed.
+- Verification (test name or manual steps): `tests/ticketNavigation.test.ts`. Manual: navigate ticket rows and previous/next controls by keyboard; filter to an empty urgency and see the no-match message; stop/restart the API and use Retry; open T-1012 and see “No applicable policy”; resize below 760px and confirm the list stacks above details.
 - Commit: (this commit)
 
 ## Found but not fixed

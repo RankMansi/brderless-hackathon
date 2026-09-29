@@ -17,10 +17,16 @@ export function TriagePanel({ triage, loading, error, onRegenerate }: Props) {
         </button>
       </div>
 
-      {error && <div className="error-banner">{error}</div>}
+      {error && (
+        <div className="error-banner" role="alert">
+          {error}
+        </div>
+      )}
 
       {!triage && !error && (
-        <div className="empty-state">{loading ? 'Running AI triage…' : 'No triage yet.'}</div>
+        <div className="empty-state" aria-live="polite">
+          {loading ? 'Running AI triage…' : 'No triage yet.'}
+        </div>
       )}
 
       {triage && (
@@ -33,21 +39,25 @@ export function TriagePanel({ triage, loading, error, onRegenerate }: Props) {
             </span>
           </div>
 
-          <h4>Drafted reply</h4>
+          <h4>Customer-facing draft</h4>
           <pre className="drafted-reply">{triage.reply}</pre>
 
-          <h4>Reasoning</h4>
+          <h4>Internal triage reasoning</h4>
           <p className="reasoning">{triage.reasoning}</p>
 
           <h4>Policy context used</h4>
-          <ul className="citations">
-            {triage.citations.map((c) => (
-              <li key={c.docId}>
-                <strong>{c.title}</strong>
-                <span className="snippet">{c.snippet}</span>
-              </li>
-            ))}
-          </ul>
+          {triage.citations.length === 0 ? (
+            <p className="reasoning">No applicable policy was found for this ticket.</p>
+          ) : (
+            <ul className="citations">
+              {triage.citations.map((c) => (
+                <li key={c.docId}>
+                  <strong>{c.title}</strong>
+                  <span className="snippet">{c.snippet}</span>
+                </li>
+              ))}
+            </ul>
+          )}
 
           <div className="triage-footer">
             Generated {new Date(triage.generatedAt).toLocaleTimeString()}

@@ -8,9 +8,10 @@ interface Props {
   tickets: TicketSummary[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  loading: boolean;
 }
 
-export function TicketList({ tickets, selectedId, onSelect }: Props) {
+export function TicketList({ tickets, selectedId, onSelect, loading }: Props) {
   const [filter, setFilter] = useState<UrgencyFilter>('all');
 
   const visible =
@@ -35,25 +36,38 @@ export function TicketList({ tickets, selectedId, onSelect }: Props) {
         </select>
       </div>
       <ul>
+        {loading && tickets.length === 0 && (
+          <li className="list-empty" aria-live="polite">
+            Loading tickets…
+          </li>
+        )}
+        {!loading && visible.length === 0 && (
+          <li className="list-empty">No tickets match this urgency.</li>
+        )}
         {visible.map((t) => (
-          <li
-            key={t.id}
-            className={`ticket-item ${t.id === selectedId ? 'selected' : ''}`}
-            onClick={() => onSelect(t.id)}
-          >
-            <div className="ticket-item-top">
-              <span className="ticket-id">{t.id}</span>
-              {t.lastTriage && (
-                <span className={`badge badge-${t.lastTriage.urgency}`}>
-                  {t.lastTriage.urgency}
-                </span>
-              )}
-              {t.lastTriage?.escalate && <span className="badge badge-escalate">escalate</span>}
-            </div>
-            <div className="ticket-subject">{t.subject}</div>
-            <div className="ticket-meta">
-              {t.customerName} · <span className={`plan plan-${t.plan}`}>{t.plan}</span>
-            </div>
+          <li key={t.id}>
+            <button
+              type="button"
+              className={`ticket-item ${t.id === selectedId ? 'selected' : ''}`}
+              aria-current={t.id === selectedId ? 'true' : undefined}
+              onClick={() => onSelect(t.id)}
+            >
+              <span className="ticket-item-top">
+                <span className="ticket-id">{t.id}</span>
+                {t.lastTriage && (
+                  <span className={`badge badge-${t.lastTriage.urgency}`}>
+                    {t.lastTriage.urgency}
+                  </span>
+                )}
+                {t.lastTriage?.escalate && (
+                  <span className="badge badge-escalate">escalate</span>
+                )}
+              </span>
+              <span className="ticket-subject">{t.subject}</span>
+              <span className="ticket-meta">
+                {t.customerName} · <span className={`plan plan-${t.plan}`}>{t.plan}</span>
+              </span>
+            </button>
           </li>
         ))}
       </ul>

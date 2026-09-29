@@ -86,12 +86,20 @@ body {
 }
 
 .ticket-item {
+  display: block;
+  width: 100%;
   padding: 12px 14px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
 }
 
-.ticket-item:hover {
+.ticket-item:hover,
+.ticket-item:focus-visible {
   background: #f0f3fb;
 }
 
@@ -114,12 +122,14 @@ body {
 }
 
 .ticket-subject {
+  display: block;
   font-size: 14px;
   font-weight: 600;
   margin-bottom: 3px;
 }
 
 .ticket-meta {
+  display: block;
   font-size: 12px;
   color: var(--muted);
 }
@@ -135,6 +145,35 @@ body {
 
 .plan-pro {
   color: var(--accent);
+}
+
+.list-empty {
+  padding: 24px 14px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.ticket-navigation {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.ticket-navigation button,
+.error-banner button,
+.retry-button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.ticket-navigation button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 /* Badges */
@@ -367,4 +406,18 @@ body {
   padding: 10px 14px;
   margin: 10px 0;
   font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .app {
+    padding: 12px;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .ticket-list ul {
+    max-height: 38vh;
+  }
 }

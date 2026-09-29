@@ -20,6 +20,7 @@ export function TicketView({ ticketId, onTriageComplete }: Props) {
   const [triage, setTriage] = useState<TriageResult | null>(null);
   const [triageLoading, setTriageLoading] = useState(false);
   const [triageError, setTriageError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const generation = useRef(0);
 
   useEffect(() => {
@@ -66,7 +67,7 @@ export function TicketView({ ticketId, onTriageComplete }: Props) {
     return () => {
       if (generation.current === gen) generation.current += 1;
     };
-  }, [ticketId, onTriageComplete]);
+  }, [ticketId, onTriageComplete, loadAttempt]);
 
   const regenerate = () => {
     const gen = ++generation.current;
@@ -87,8 +88,27 @@ export function TicketView({ ticketId, onTriageComplete }: Props) {
       });
   };
 
-  if (ticketError) return <div className="error-banner">Could not load ticket: {ticketError}</div>;
-  if (!ticket) return <div className="empty-state">Loading ticket…</div>;
+  if (ticketError) {
+    return (
+      <div className="error-banner" role="alert">
+        Could not load ticket: {ticketError}{' '}
+        <button
+          className="retry-button"
+          type="button"
+          onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+  if (!ticket) {
+    return (
+      <div className="empty-state" aria-live="polite">
+        Loading ticket…
+      </div>
+    );
+  }
 
   return (
     <div className="ticket-view">

@@ -79,8 +79,10 @@ function matchesPolicyIntent(docId: string, queryTerms: Set<string>): boolean {
     case 'policy-enterprise-sla':
       return ['outage', 'sla', 'uptime'].some((term) => queryTerms.has(term));
     case 'policy-security-incident':
-      return ['security', 'unauthorized', 'login', 'password'].some((term) =>
-        queryTerms.has(term)
+      return (
+        queryTerms.has('security') ||
+        queryTerms.has('unauthorized') ||
+        (queryTerms.has('suspicious') && queryTerms.has('login'))
       );
     case 'policy-cancellation':
       return queryTerms.has('cancel');
@@ -113,6 +115,9 @@ export function searchPolicies(
 ): ScoredDoc[] {
   const terms = tokenize(query);
   if (/wasn'?t me|was not me|someone .{0,30}(?:signed in|logged in)/i.test(query)) {
+    terms.push('unauthorized');
+  }
+  if (/hacked|compromis(?:e|ed)|stolen (?:password|credential)/i.test(query)) {
     terms.push('unauthorized');
   }
   const normalizedQueryTerms = new Set(terms.map(normalizeTerm));

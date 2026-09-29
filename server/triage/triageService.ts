@@ -5,6 +5,7 @@ import { buildTriagePrompt, SYSTEM_PROMPT } from './promptBuilder';
 import { parseTriageResponse } from './parser';
 import {
   enforceBillingReview,
+  enforceCategoryRules,
   enforceEscalationFloor,
   enforceGroundedReply,
   enforceRefundWindow,
@@ -65,7 +66,10 @@ async function runTriageOnce(ticket: Ticket): Promise<TriageResult> {
           ticket,
           enforceBillingReview(
             ticket,
-            enforceRefundWindow(ticket, parseTriageResponse(raw))
+            enforceRefundWindow(
+              ticket,
+              enforceCategoryRules(ticket, parseTriageResponse(raw))
+            )
           ),
           policies
         )

@@ -11,6 +11,8 @@ const SLA_BREACH = /outage|\buptime\b|\bsla\b|service credit|dashboard down/i;
 const BILLING_DISPUTE = /charg(?:e|ed)|billing|billed|invoice|dispute/i;
 const LEGAL_REFUND_EXCEPTION =
   /consumer law|statutory|legally required|required by law|legal right/i;
+const PASSWORD_RESET_SUPPORT =
+  /password reset|reset (?:email|link|message)|reset my password/i;
 
 function ticketText(ticket: Ticket): string {
   return `${ticket.subject}\n${ticket.message}`;
@@ -27,6 +29,22 @@ function hasBillingDisputeOverLimit(ticket: Ticket): boolean {
 function hasLegalRefundException(ticket: Ticket): boolean {
   const text = ticketText(ticket);
   return REFUND_REQUEST.test(text) && LEGAL_REFUND_EXCEPTION.test(text);
+}
+
+export function enforceCategoryRules(ticket: Ticket, parsed: ParsedTriage): ParsedTriage {
+  const text = ticketText(ticket);
+  if (
+    parsed.category === 'security' &&
+    PASSWORD_RESET_SUPPORT.test(text) &&
+    !SECURITY_INCIDENT.test(text)
+  ) {
+    return {
+      ...parsed,
+      category: 'account',
+      reasoning: `${parsed.reasoning} Policy guard: password-reset delivery failure is account support, not a reported security incident.`,
+    };
+  }
+  return parsed;
 }
 
 /**

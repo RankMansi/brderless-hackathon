@@ -142,6 +142,14 @@
 - Root cause: The prompt did not distinguish drafting advice from performing account actions, and there was no deterministic grounding rule for these high-impact seed paths. The mock encoded plausible but unsupported operational claims.
 - Fix (and why this layer): The prompt now forbids claims that account actions were completed. A post-parse grounding guard turns in-window refund drafts into eligibility language, describes enterprise outages as suspected until reviewed, and explicitly says retention is unspecified when no retrieved policy supports a duration. Deterministic rewrites are used where a send-ready draft could otherwise make a false commitment.
 - Verification (test name or manual steps): `tests/replyGrounding.test.ts`, plus all seed-ticket regression suites.
+- Commit: 9ccd56e
+
+### 19. Password-reset delivery failures were labeled as security incidents  [priority: med]
+- Symptom: T-1013 (“password reset email never arrives”) was categorized as `security` and cited the security-incident policy even though it reports no unauthorized access or credential compromise. This can send routine account support into the wrong queue.
+- Reproduction: Triage T-1013 with the mock. Before the fix the category was `security`, urgency was medium, and the security policy was cited.
+- Root cause: The model classified any message containing “password” as security, while retrieval treated `password`/`login` alone as security intent.
+- Fix (and why this layer): Retrieval now requires actual incident intent such as security, unauthorized access, suspicious login, hacking, or compromised credentials. A deterministic post-parse category rule maps password-reset delivery failures to `account` unless incident language is also present. Retrieval controls citations; the business-rule layer protects routing from model drift.
+- Verification (test name or manual steps): `tests/accountClassification.test.ts`; T-1004 security regressions remain covered by retrieval, escalation, and business-policy tests.
 - Commit: (this commit)
 
 ## Found but not fixed
@@ -150,7 +158,6 @@
 - The API has no authentication. This is a single-agent local tool; adding accounts would be a product change.
 - A 429 is returned to the agent and the previous result is kept. I did not add retries, because retrying a rate limit can make it worse.
 - Prompt delimiters and the "never follow" instruction do not make injection impossible on a real model. The hard stop in this app is the 30-day refund check. Other promises a model might invent (credits, discounts, legal conclusions) are not exhaustively rewritten.
-- T-1013 (password reset email never arrives) can still be categorized `security` because the model sees the word "password". It is not escalated. Assumption: that is account support unless the message describes unauthorized access.
 - Drafted replies are rendered as text inside `<pre>`, so model HTML is not executed. Checked, not changed.
 
 ## Priority reasoning

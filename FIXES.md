@@ -30,14 +30,14 @@
 - Root cause: `runTriage` copied `escalate` from the model. The mock (and a typical model) judges tone: loud complaints escalate, calm ones do not. The policies are not tone-based.
 - Fix (and why this layer): `enforceEscalationFloor` in the triage service forces `escalate: true` for security-incident language, privacy/data-export language (or a privacy category), and enterprise tickets that describe an outage or SLA breach. The model can still set escalation when the floor does not. Assumption: a password-reset failure (T-1013) is account support, not a security incident, unless the message describes unauthorized access. The floor looks at the ticket text, not only the model's category, because the category string is not yet normalized.
 - Verification (test name or manual steps): `tests/escalation.test.ts`.
-- Commit:
+- Commit: dd137a8
 
 ### 5. Model label drift broke urgency filters and badges  [priority: med]
-- Symptom:
-- Reproduction:
-- Root cause:
-- Fix (and why this layer):
-- Verification (test name or manual steps):
+- Symptom: After triage, the list filter "Urgency: high" hid tickets whose urgency came back as `High` or `urgent`. Those badges also rendered with the default grey style, because CSS only defines `.badge-high`, `.badge-medium`, and `.badge-low`. Categories arrived as `billing_issue`, `refund_request`, `incident`, `data_request`, `churn`, and `other`. The string `"false"` for escalate was stored as `true`.
+- Reproduction: Triage T-1006, T-1008, T-1010, or T-1013 with the mock LLM and inspect `category` / `urgency`. `parseTriageResponse` of `{ "escalate": "false" }` returned `true`. Set the list filter to "Urgency: high" and tickets labeled `High` or `urgent` disappeared.
+- Root cause: `parseTriageResponse` passed model strings through with `String(...)` and `Boolean(...)`. `Boolean("false")` is `true` in JavaScript. The list filter and badge class names use exact equality against `high` | `medium` | `low`.
+- Fix (and why this layer): Normalize at the parser, which is the boundary for model output. Synonyms map onto the closed `Category` and `Urgency` unions in `shared/types.ts`; unknown labels, an empty reply, and malformed JSON throw instead of being stored. The UI was left on strict equality so a future drift fails closed at the parser rather than being papered over in the component.
+- Verification (test name or manual steps): `tests/parser.test.ts` (normalization table, string `"false"`, unknown category, empty reply, malformed JSON). Manual: triage several tickets, set "Urgency: high", and confirm high-urgency tickets stay visible with a red badge.
 - Commit:
 
 ### 6. Switching tickets showed another ticket's triage  [priority: med]

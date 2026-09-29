@@ -26,6 +26,21 @@ export interface PolicyDoc {
   updatedAt: string;
 }
 
+export const CATEGORIES = [
+  'refund',
+  'billing',
+  'outage',
+  'security',
+  'cancellation',
+  'privacy',
+  'account',
+  'general',
+] as const;
+export type Category = (typeof CATEGORIES)[number];
+
+export const URGENCIES = ['low', 'medium', 'high'] as const;
+export type Urgency = (typeof URGENCIES)[number];
+
 export interface Citation {
   docId: string;
   title: string;
@@ -34,8 +49,8 @@ export interface Citation {
 
 export interface TriageResult {
   ticketId: string;
-  category: string;
-  urgency: string;
+  category: Category;
+  urgency: Urgency;
   escalate: boolean;
   reply: string;
   reasoning: string;
@@ -51,8 +66,8 @@ export interface TicketSummary {
   status: Ticket['status'];
   createdAt: string;
   lastTriage?: {
-    category: string;
-    urgency: string;
+    category: Category;
+    urgency: Urgency;
     escalate: boolean;
   };
 }

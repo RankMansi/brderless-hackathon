@@ -40,4 +40,47 @@ describe('parseTriageResponse', () => {
       /missing field: reply/
     );
   });
+
+  it('normalizes drifted category and urgency labels', () => {
+    const cases: Array<[string, string, string, string]> = [
+      ['billing_issue', 'High', 'billing', 'high'],
+      ['Refund', 'urgent', 'refund', 'high'],
+      ['general', 'normal', 'general', 'medium'],
+      ['other', 'Low', 'general', 'low'],
+      ['incident', 'medium', 'outage', 'medium'],
+      ['churn', 'medium', 'cancellation', 'medium'],
+      ['data_request', 'medium', 'privacy', 'medium'],
+      ['refund_request', 'normal', 'refund', 'medium'],
+    ];
+    for (const [category, urgency, expectedCategory, expectedUrgency] of cases) {
+      const result = parseTriageResponse(
+        JSON.stringify({ ...validPayload, category, urgency })
+      );
+      expect(result.category).toBe(expectedCategory);
+      expect(result.urgency).toBe(expectedUrgency);
+    }
+  });
+
+  it('parses the string "false" as boolean false', () => {
+    const result = parseTriageResponse(
+      JSON.stringify({ ...validPayload, escalate: 'false' })
+    );
+    expect(result.escalate).toBe(false);
+  });
+
+  it('rejects an unknown category', () => {
+    expect(() =>
+      parseTriageResponse(JSON.stringify({ ...validPayload, category: 'spaceship' }))
+    ).toThrow(/unknown category/i);
+  });
+
+  it('rejects an empty reply', () => {
+    expect(() => parseTriageResponse(JSON.stringify({ ...validPayload, reply: '   ' }))).toThrow(
+      /reply/i
+    );
+  });
+
+  it('rejects malformed JSON instead of throwing a raw syntax error', () => {
+    expect(() => parseTriageResponse('prefix { "category": } trailing')).toThrow(/malformed JSON/);
+  });
 });

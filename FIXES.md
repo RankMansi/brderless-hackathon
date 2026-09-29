@@ -46,14 +46,14 @@
 - Root cause: `TicketView` kept the previous `triage` state when `ticketId` changed, and the in-flight promise always called `setTriage`. There was no generation or `ticketId` check. The same gap existed on Regenerate.
 - Fix (and why this layer): In `TicketView`, clear ticket and triage state when the selection changes, and apply a response only when `shouldApplyTriage` says the request generation and `result.ticketId` are still current. The bug is a client race; the API result itself is stored under the correct ticket id.
 - Verification (test name or manual steps): `tests/triageFreshness.test.ts`. Manual: select T-1003, immediately select T-1012, and confirm the panel shows "Running AI triage…" and then a reply that does not mention the outage or INC details. The reply and the ticket id on screen must match. Click Regenerate on T-1003 and switch to T-1012 before it finishes; T-1012 must not keep T-1003's draft.
-- Commit:
+- Commit: 02e1048
 
 ### 7. Triage was not debuggable from logs  [priority: med]
-- Symptom:
-- Reproduction:
-- Root cause:
-- Fix (and why this layer):
-- Verification (test name or manual steps):
+- Symptom: When a reply cited the wrong policy or leaked a note, the server log was only `[triage] T-xxxx -> category/urgency`. The query, retrieved documents and scores, prompt, and raw model text were not recorded, so the failure had to be reconstructed by re-running the pipeline.
+- Reproduction: Triage any ticket and read the API process output. There is no field for which policy won or what the model actually returned.
+- Root cause: `runTriage` logged a single summary string after a successful store and logged nothing on failure.
+- Fix (and why this layer): Log one JSON object per attempt from the triage service, including query, retrieved id/score/status, the prompt, and the raw response, then store the result. On failure, log `triage_error` with the same context and rethrow, so the previous stored result is left in place and the error is not swallowed. The log stays on the server. It does not include internal notes, and it is not returned to the browser.
+- Verification (test name or manual steps): `tests/triageLog.test.ts`.
 - Commit:
 
 ## Found but not fixed

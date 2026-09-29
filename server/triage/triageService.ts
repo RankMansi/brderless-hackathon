@@ -16,35 +16,73 @@ export async function runTriage(ticket: Ticket): Promise<TriageResult> {
     retrieved.map((r) => r.doc)
   );
 
-  const llm = getLLMClient();
-  const raw = await llm.complete({ system: SYSTEM_PROMPT, user: prompt });
-  const parsed = enforceEscalationFloor(
-    ticket,
-    enforceRefundWindow(ticket, parseTriageResponse(raw))
-  );
+  const retrievedLog = retrieved.map((r) => ({
+    id: r.doc.id,
+    title: r.doc.title,
+    score: r.score,
+    status: r.doc.status,
+  }));
 
-  if (findLeakedInternalNote(parsed.reply, ticket.internalNotes)) {
-    throw new Error(
-      `Refusing to store triage for ${ticket.id}: drafted reply repeats internal notes`
+  let raw = '';
+  try {
+    const llm = getLLMClient();
+    raw = await llm.complete({ system: SYSTEM_PROMPT, user: prompt });
+    const parsed = enforceEscalationFloor(
+      ticket,
+      enforceRefundWindow(ticket, parseTriageResponse(raw))
     );
+
+    if (findLeakedInternalNote(parsed.reply, ticket.internalNotes)) {
+      throw new Error(
+        `Refusing to store triage for ${ticket.id}: drafted reply repeats internal notes`
+      );
+    }
+
+    const result: TriageResult = {
+      ticketId: ticket.id,
+      category: parsed.category,
+      urgency: parsed.urgency,
+      escalate: parsed.escalate,
+      reply: parsed.reply,
+      reasoning: parsed.reasoning,
+      citations: retrieved.map((r) => ({
+        docId: r.doc.id,
+        title: r.doc.title,
+        snippet: r.doc.body.slice(0, 140) + '…',
+      })),
+      generatedAt: new Date().toISOString(),
+    };
+
+    // One structured line so a bad citation or a bad draft can be traced
+    // without guessing. Internal notes are not included; they are not in the prompt.
+    console.log(
+      JSON.stringify({
+        event: 'triage',
+        ticketId: ticket.id,
+        query,
+        retrieved: retrievedLog,
+        prompt,
+        raw,
+        category: result.category,
+        urgency: result.urgency,
+        escalate: result.escalate,
+      })
+    );
+
+    db.triageResults.set(ticket.id, result);
+    return result;
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        event: 'triage_error',
+        ticketId: ticket.id,
+        query,
+        retrieved: retrievedLog,
+        prompt,
+        raw,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    );
+    throw err;
   }
-
-  const result: TriageResult = {
-    ticketId: ticket.id,
-    category: parsed.category,
-    urgency: parsed.urgency,
-    escalate: parsed.escalate,
-    reply: parsed.reply,
-    reasoning: parsed.reasoning,
-    citations: retrieved.map((r) => ({
-      docId: r.doc.id,
-      title: r.doc.title,
-      snippet: r.doc.body.slice(0, 140) + '…',
-    })),
-    generatedAt: new Date().toISOString(),
-  };
-
-  db.triageResults.set(ticket.id, result);
-  console.log(`[triage] ${ticket.id} -> ${result.category}/${result.urgency}`);
-  return result;
 }

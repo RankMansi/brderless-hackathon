@@ -3,6 +3,7 @@ import { db } from '../store';
 import { searchPolicies } from '../retrieval/policySearch';
 import { buildTriagePrompt, SYSTEM_PROMPT } from './promptBuilder';
 import { parseTriageResponse } from './parser';
+import { findLeakedInternalNote } from './replySafety';
 import { getLLMClient } from '../llm/client';
 
 export async function runTriage(ticket: Ticket): Promise<TriageResult> {
@@ -17,6 +18,12 @@ export async function runTriage(ticket: Ticket): Promise<TriageResult> {
   const llm = getLLMClient();
   const raw = await llm.complete({ system: SYSTEM_PROMPT, user: prompt });
   const parsed = parseTriageResponse(raw);
+
+  if (findLeakedInternalNote(parsed.reply, ticket.internalNotes)) {
+    throw new Error(
+      `Refusing to store triage for ${ticket.id}: drafted reply repeats internal notes`
+    );
+  }
 
   const result: TriageResult = {
     ticketId: ticket.id,

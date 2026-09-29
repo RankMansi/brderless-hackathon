@@ -18,8 +18,9 @@ function daysBetween(from: string, to: string): number {
 }
 
 /**
- * Serialize everything we know about a ticket so the model has full context
- * to triage accurately.
+ * Customer-visible ticket facts only. Internal notes are shown to agents in
+ * the UI; putting them in this prompt makes the model repeat them in the
+ * drafted reply.
  */
 export function formatTicketContext(ticket: Ticket): string {
   const lines = [
@@ -32,11 +33,6 @@ export function formatTicketContext(ticket: Ticket): string {
     lines.push(`Purchase date: ${ticket.purchaseDate} (purchased ${days} days ago)`);
   }
   lines.push('', 'Customer message:', ticket.message);
-  lines.push(
-    '',
-    'Internal notes:',
-    ticket.internalNotes.length ? ticket.internalNotes.map((n) => `- ${n}`).join('\n') : 'none'
-  );
   return lines.join('\n');
 }
 

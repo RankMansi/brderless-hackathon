@@ -86,6 +86,14 @@
 - Root cause: The deterministic rule tried to enumerate approval wording rather than enforce the policy outcome for refund-request tickets.
 - Fix (and why this layer): The policy guard now identifies refund requests from the ticket. For purchases older than 30 days, any reply that does not already clearly deny eligibility is replaced with the policy denial. When the purchase date is absent or invalid, the reply requires verification instead of deciding eligibility. Non-refund tickets and clear existing denials are unchanged.
 - Verification (test name or manual steps): `tests/refundGuardCoverage.test.ts`, plus the existing refund and injection suites.
+- Commit: 788a3f8
+
+### 12. Concurrent requests ran duplicate triage for the same ticket  [priority: med]
+- Symptom: Two near-simultaneous POSTs for one ticket made two model calls. They could consume duplicate paid capacity and race to overwrite one another with different model output.
+- Reproduction: Call `runTriage(ticket)` twice without awaiting the first call, using a delayed client that counts completions. Before the fix the count was 2 and both runs logged and stored independently.
+- Root cause: The triage service had no per-ticket in-flight coordination; the disabled UI button did not protect API callers or two browser sessions.
+- Fix (and why this layer): `runTriage` now keeps one in-flight promise per ticket and returns it to concurrent callers. The entry is removed in `finally`, so a later explicit regeneration still makes a fresh model call. Coordination belongs in the service because every route and caller passes through it.
+- Verification (test name or manual steps): `tests/triageConcurrency.test.ts`.
 - Commit: (this commit)
 
 ## Found but not fixed
@@ -93,7 +101,6 @@
 - Keyword retrieval is still raw term frequency. T-1012 mentions an "export button" and the top hit is the privacy policy. The drafted reply does not promise an export, and the escalation floor does not treat that ticket as a privacy request. Replacing the ranker would be a new design, not a fix for a wrong decision on the seed set.
 - `daysAgo` in the seed data uses local `setDate`, so a gap that crosses daylight saving time can floor one day short (T-1008's structured age was 198 days while the message says 200). Every seed refund is far from the 30-day boundary, and the guard uses the same timestamps the prompt shows the model. I left the generator alone.
 - The API has no authentication. This is a single-agent local tool; adding accounts would be a product change.
-- Two overlapping triages of the same ticket both run, and the last write wins. Each result is a triage of that ticket. I did not add a lock.
 - A 429 is returned to the agent and the previous result is kept. I did not add retries, because retrying a rate limit can make it worse.
 - Billing disputes over $500 are supposed to go to the billing team before any commitment. No seed ticket shows a wrong commitment at that amount. T-1003 mentions $4,200/month as an SLA complaint, so a dollar-amount parser would be easy to get wrong.
 - Prompt delimiters and the "never follow" instruction do not make injection impossible on a real model. The hard stop in this app is the 30-day refund check. Other promises a model might invent (credits, discounts, legal conclusions) are not exhaustively rewritten.

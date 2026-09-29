@@ -8,7 +8,20 @@ import { findLeakedInternalNote } from './replySafety';
 import { getLLMClient } from '../llm/client';
 import { llmTimeoutMs, withTimeout } from '../llm/timeout';
 
-export async function runTriage(ticket: Ticket): Promise<TriageResult> {
+const inFlight = new Map<string, Promise<TriageResult>>();
+
+export function runTriage(ticket: Ticket): Promise<TriageResult> {
+  const existing = inFlight.get(ticket.id);
+  if (existing) return existing;
+
+  const request = runTriageOnce(ticket).finally(() => {
+    if (inFlight.get(ticket.id) === request) inFlight.delete(ticket.id);
+  });
+  inFlight.set(ticket.id, request);
+  return request;
+}
+
+async function runTriageOnce(ticket: Ticket): Promise<TriageResult> {
   const query = `${ticket.subject} ${ticket.message}`;
   const retrieved = searchPolicies(query, db.policies, 3);
 

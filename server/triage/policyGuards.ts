@@ -1,4 +1,4 @@
-import type { Ticket } from '../../shared/types';
+import type { PolicyDoc, Ticket } from '../../shared/types';
 import type { ParsedTriage } from './parser';
 
 const SECURITY_INCIDENT =
@@ -86,13 +86,86 @@ export function enforceBillingReview(ticket: Ticket, parsed: ParsedTriage): Pars
     reply: [
       'Hi, thanks for reaching out.',
       '',
-      'Because this dispute is over $500, our billing team must review the charge history before we make any commitment. We have routed it for specialist review and will follow up after verification.',
+      'Because this dispute is over $500, our billing team must review the charge history before any commitment is made. A support agent will route it for specialist review and follow up after verification.',
       '',
       'Best regards,',
       'Support Team',
     ].join('\n'),
     reasoning: `${parsed.reasoning} Policy guard: billing disputes over $500 require billing-team review before any commitment.`,
   };
+}
+
+export function enforceGroundedReply(
+  ticket: Ticket,
+  parsed: ParsedTriage,
+  policies: PolicyDoc[]
+): ParsedTriage {
+  const text = ticketText(ticket);
+  const days = daysSincePurchase(ticket);
+
+  if (
+    REFUND_REQUEST.test(text) &&
+    days !== null &&
+    days <= REFUND_WINDOW_DAYS &&
+    /(?:i(?:'ve| have) |has been |already )(?:started|approved|processed)|refund (?:is|was) (?:started|approved|processed)/i.test(
+      parsed.reply
+    )
+  ) {
+    return {
+      ...parsed,
+      reply: [
+        'Hi, thanks for reaching out.',
+        '',
+        `Based on the purchase date, your request is within our ${REFUND_WINDOW_DAYS}-day refund window and is eligible for processing. We have not yet started the refund; a support agent can verify the order and initiate it to the original payment method.`,
+        '',
+        'Best regards,',
+        'Support Team',
+      ].join('\n'),
+      reasoning: `${parsed.reasoning} Policy guard: the draft cannot claim the refund was initiated because triage does not perform account actions.`,
+    };
+  }
+
+  if (
+    ticket.customer.plan === 'enterprise' &&
+    SLA_BREACH.test(text)
+  ) {
+    return {
+      ...parsed,
+      reply: [
+        'Hi, thanks for reaching out.',
+        '',
+        'I’m sorry for the disruption. This report is a suspected SLA breach and needs immediate escalation to the enterprise success team. They will verify the incident duration, assess any service credits under the SLA, and coordinate the appropriate follow-up.',
+        '',
+        'Best regards,',
+        'Support Team',
+      ].join('\n'),
+      reasoning: `${parsed.reasoning} Policy guard: the draft must not present a reported incident or service-credit decision as already verified.`,
+    };
+  }
+
+  const asksAboutRetention =
+    /cancel/i.test(text) && /data|retention|retain|deleted|deletion/i.test(text);
+  const hasRetentionPolicy = policies.some((policy) =>
+    /data.{0,30}(?:retain|retention|delete|deletion)|(?:retain|retention).{0,30}data/i.test(
+      policy.body
+    )
+  );
+  if (asksAboutRetention && !hasRetentionPolicy) {
+    return {
+      ...parsed,
+      reply: [
+        'Hi, thanks for reaching out.',
+        '',
+        'You can cancel at any time, and access continues until the end of the current billing period. A pause of up to 3 months is also available as an alternative. The data-retention period is not specified in the available cancellation policy, so a support agent must confirm that detail before giving you a timeline.',
+        '',
+        'Best regards,',
+        'Support Team',
+      ].join('\n'),
+      reasoning: `${parsed.reasoning} Policy guard: the available policy does not support a specific post-cancellation data-retention period.`,
+    };
+  }
+
+  return parsed;
 }
 
 /** Matches the active refund policy (policy-refund-v3), not the deprecated 90-day text. */
@@ -150,7 +223,7 @@ export function enforceRefundWindow(ticket: Ticket, parsed: ParsedTriage): Parse
       reply: [
         'Hi, thanks for reaching out.',
         '',
-        'Your request is outside our standard 30-day refund window, and you have raised a potential legal exception. We have routed it to a specialist for review before making an eligibility decision.',
+        'Your request is outside our standard 30-day refund window, and you have raised a potential legal exception. A support agent must route it to a specialist for review before making an eligibility decision.',
         '',
         'Best regards,',
         'Support Team',

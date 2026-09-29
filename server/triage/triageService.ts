@@ -6,6 +6,7 @@ import { parseTriageResponse } from './parser';
 import {
   enforceBillingReview,
   enforceEscalationFloor,
+  enforceGroundedReply,
   enforceRefundWindow,
   enforceUrgencyFloor,
 } from './policyGuards';
@@ -38,11 +39,9 @@ export function runTriage(ticket: Ticket): Promise<TriageResult> {
 async function runTriageOnce(ticket: Ticket): Promise<TriageResult> {
   const query = `${ticket.subject} ${ticket.message}`;
   const retrieved = searchPolicies(query, db.policies, 3);
+  const policies = retrieved.map((result) => result.doc);
 
-  const prompt = buildTriagePrompt(
-    ticket,
-    retrieved.map((r) => r.doc)
-  );
+  const prompt = buildTriagePrompt(ticket, policies);
 
   const retrievedLog = retrieved.map((r) => ({
     id: r.doc.id,
@@ -62,9 +61,13 @@ async function runTriageOnce(ticket: Ticket): Promise<TriageResult> {
       ticket,
       enforceEscalationFloor(
         ticket,
-        enforceBillingReview(
+        enforceGroundedReply(
           ticket,
-          enforceRefundWindow(ticket, parseTriageResponse(raw))
+          enforceBillingReview(
+            ticket,
+            enforceRefundWindow(ticket, parseTriageResponse(raw))
+          ),
+          policies
         )
       )
     );

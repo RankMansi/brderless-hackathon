@@ -134,6 +134,14 @@
 - Root cause: The first escalation floor covered only the supplied seed scenarios, and the refund guard treated the standard 30-day denial as unconditional even though policy-refund-v3 contains a legal exception.
 - Fix (and why this layer): Policy guards now set high urgency for security incidents, enterprise SLA breaches, and claimed legal refund exceptions; force billing-team review and a non-committal reply for disputes over $500; and route claimed legal refund exceptions for specialist review rather than approving or denying them. These are deterministic policy obligations, so they are enforced after parsing and cannot be lowered by model output.
 - Verification (test name or manual steps): `tests/businessPolicy.test.ts`, plus the existing escalation/refund suites.
+- Commit: b4003ab
+
+### 18. Drafted replies claimed unsupported facts and completed actions  [priority: high]
+- Symptom: T-1001 said “I’ve started the refund process” although triage performs no refund action. T-1003 claimed the incident was confirmed, credits would be applied, and an engineering-leadership call was being arranged, although only the customer report and public SLA policy were in the prompt. T-1005 invented a 30-day post-cancellation data-retention period that appears in no policy.
+- Reproduction: Triage T-1001, T-1003, and T-1005 with the mock. Each unsupported statement appeared reliably.
+- Root cause: The prompt did not distinguish drafting advice from performing account actions, and there was no deterministic grounding rule for these high-impact seed paths. The mock encoded plausible but unsupported operational claims.
+- Fix (and why this layer): The prompt now forbids claims that account actions were completed. A post-parse grounding guard turns in-window refund drafts into eligibility language, describes enterprise outages as suspected until reviewed, and explicitly says retention is unspecified when no retrieved policy supports a duration. Deterministic rewrites are used where a send-ready draft could otherwise make a false commitment.
+- Verification (test name or manual steps): `tests/replyGrounding.test.ts`, plus all seed-ticket regression suites.
 - Commit: (this commit)
 
 ## Found but not fixed

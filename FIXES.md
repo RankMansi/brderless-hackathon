@@ -126,6 +126,14 @@
 - Root cause: Scoring counted substring frequency, including repeated query terms and matches inside other words, accepted a single weak overlap, and had no explicit tie-break.
 - Fix (and why this layer): Retrieval now compares unique normalized tokens, handles common plurals/label variants, ignores low-signal support vocabulary, requires policy-specific intent (or multiple matches including a title match), weights title matches, and breaks ties by newest policy date then id. No-match is now preferred over misleading context. This is implemented in retrieval so prompts, citations, and every caller receive the same ranked set.
 - Verification (test name or manual steps): `tests/retrievalQuality.test.ts` covers applicable seed policies, no-match seed tickets, plurals/variants, generic overlap, and ties; existing retrieval and triage suites remain green.
+- Commit: 4a66fe4
+
+### 17. Mandatory urgency, high-value billing review, and legal refund exceptions were not enforced  [priority: high]
+- Symptom: T-1004 was escalated but remained medium urgency despite the security policy’s 30-minute deadline. A duplicate-charge dispute over $500 could be left unescalated and receive a commitment before billing review. The refund guard automatically denied an old purchase even when the customer raised the active policy’s “required by law” exception.
+- Reproduction: Triage T-1004. Then use a model that returns low/no-escalation for “charged $750 twice.” Finally triage a 75-day refund whose message says consumer law requires a refund. Before the fix the outcomes were medium urgency, no billing escalation, and a final refund denial respectively.
+- Root cause: The first escalation floor covered only the supplied seed scenarios, and the refund guard treated the standard 30-day denial as unconditional even though policy-refund-v3 contains a legal exception.
+- Fix (and why this layer): Policy guards now set high urgency for security incidents, enterprise SLA breaches, and claimed legal refund exceptions; force billing-team review and a non-committal reply for disputes over $500; and route claimed legal refund exceptions for specialist review rather than approving or denying them. These are deterministic policy obligations, so they are enforced after parsing and cannot be lowered by model output.
+- Verification (test name or manual steps): `tests/businessPolicy.test.ts`, plus the existing escalation/refund suites.
 - Commit: (this commit)
 
 ## Found but not fixed
@@ -133,7 +141,6 @@
 - `daysAgo` in the seed data uses local `setDate`, so a gap that crosses daylight saving time can floor one day short (T-1008's structured age was 198 days while the message says 200). Every seed refund is far from the 30-day boundary, and the guard uses the same timestamps the prompt shows the model. I left the generator alone.
 - The API has no authentication. This is a single-agent local tool; adding accounts would be a product change.
 - A 429 is returned to the agent and the previous result is kept. I did not add retries, because retrying a rate limit can make it worse.
-- Billing disputes over $500 are supposed to go to the billing team before any commitment. No seed ticket shows a wrong commitment at that amount. T-1003 mentions $4,200/month as an SLA complaint, so a dollar-amount parser would be easy to get wrong.
 - Prompt delimiters and the "never follow" instruction do not make injection impossible on a real model. The hard stop in this app is the 30-day refund check. Other promises a model might invent (credits, discounts, legal conclusions) are not exhaustively rewritten.
 - T-1013 (password reset email never arrives) can still be categorized `security` because the model sees the word "password". It is not escalated. Assumption: that is account support unless the message describes unauthorized access.
 - Drafted replies are rendered as text inside `<pre>`, so model HTML is not executed. Checked, not changed.

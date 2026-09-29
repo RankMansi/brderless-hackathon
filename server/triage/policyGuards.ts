@@ -8,6 +8,26 @@ const PRIVACY_REQUEST =
   /\bgdpr\b|\bccpa\b|personal data|data export|delete(?: my| all)? (?:my )?data|right to (?:access|erasure|be forgotten)/i;
 
 const SLA_BREACH = /outage|\buptime\b|\bsla\b|service credit|dashboard down/i;
+const BILLING_DISPUTE = /charg(?:e|ed)|billing|billed|invoice|dispute/i;
+const LEGAL_REFUND_EXCEPTION =
+  /consumer law|statutory|legally required|required by law|legal right/i;
+
+function ticketText(ticket: Ticket): string {
+  return `${ticket.subject}\n${ticket.message}`;
+}
+
+function hasBillingDisputeOverLimit(ticket: Ticket): boolean {
+  const text = ticketText(ticket);
+  if (!BILLING_DISPUTE.test(text)) return false;
+  return [...text.matchAll(/\$\s*([\d,]+(?:\.\d{1,2})?)/g)].some(
+    (match) => Number(match[1].replaceAll(',', '')) > 500
+  );
+}
+
+function hasLegalRefundException(ticket: Ticket): boolean {
+  const text = ticketText(ticket);
+  return REFUND_REQUEST.test(text) && LEGAL_REFUND_EXCEPTION.test(text);
+}
 
 /**
  * Policies require escalation for security incidents, privacy requests, and
@@ -15,9 +35,11 @@ const SLA_BREACH = /outage|\buptime\b|\bsla\b|service credit|dashboard down/i;
  * Password-reset friction is not treated as a security incident.
  */
 export function escalationRequired(ticket: Ticket, category: string): string | null {
-  const text = `${ticket.subject}\n${ticket.message}`;
+  const text = ticketText(ticket);
   if (SECURITY_INCIDENT.test(text)) return 'security incident';
   if (PRIVACY_REQUEST.test(text)) return 'privacy request';
+  if (hasLegalRefundException(ticket)) return 'claimed legal refund exception';
+  if (hasBillingDisputeOverLimit(ticket)) return 'billing dispute over $500';
 
   const cat = category.trim().toLowerCase();
   if (cat === 'privacy' || cat === 'data_request') return 'privacy request';
@@ -37,6 +59,39 @@ export function enforceEscalationFloor(ticket: Ticket, parsed: ParsedTriage): Pa
     ...parsed,
     escalate: true,
     reasoning: `${parsed.reasoning} Policy guard: escalation is required (${reason}) and cannot be lowered by the model.`,
+  };
+}
+
+export function enforceUrgencyFloor(ticket: Ticket, parsed: ParsedTriage): ParsedTriage {
+  const reason = escalationRequired(ticket, parsed.category);
+  if (
+    parsed.urgency === 'high' ||
+    (reason !== 'security incident' &&
+      reason !== 'enterprise SLA breach' &&
+      reason !== 'claimed legal refund exception')
+  ) {
+    return parsed;
+  }
+  return {
+    ...parsed,
+    urgency: 'high',
+    reasoning: `${parsed.reasoning} Policy guard: urgency is high (${reason}).`,
+  };
+}
+
+export function enforceBillingReview(ticket: Ticket, parsed: ParsedTriage): ParsedTriage {
+  if (!hasBillingDisputeOverLimit(ticket)) return parsed;
+  return {
+    ...parsed,
+    reply: [
+      'Hi, thanks for reaching out.',
+      '',
+      'Because this dispute is over $500, our billing team must review the charge history before we make any commitment. We have routed it for specialist review and will follow up after verification.',
+      '',
+      'Best regards,',
+      'Support Team',
+    ].join('\n'),
+    reasoning: `${parsed.reasoning} Policy guard: billing disputes over $500 require billing-team review before any commitment.`,
   };
 }
 
@@ -87,7 +142,24 @@ export function enforceRefundWindow(ticket: Ticket, parsed: ParsedTriage): Parse
     };
   }
 
-  if (days <= REFUND_WINDOW_DAYS || REFUND_DENIAL.test(parsed.reply)) return parsed;
+  if (days <= REFUND_WINDOW_DAYS) return parsed;
+
+  if (hasLegalRefundException(ticket)) {
+    return {
+      ...parsed,
+      reply: [
+        'Hi, thanks for reaching out.',
+        '',
+        'Your request is outside our standard 30-day refund window, and you have raised a potential legal exception. We have routed it to a specialist for review before making an eligibility decision.',
+        '',
+        'Best regards,',
+        'Support Team',
+      ].join('\n'),
+      reasoning: `${parsed.reasoning} Policy guard: a claimed legal exception requires specialist review rather than an automatic approval or denial.`,
+    };
+  }
+
+  if (REFUND_DENIAL.test(parsed.reply)) return parsed;
 
   return {
     ...parsed,

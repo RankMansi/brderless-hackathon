@@ -3,7 +3,12 @@ import { db } from '../store';
 import { searchPolicies } from '../retrieval/policySearch';
 import { buildTriagePrompt, SYSTEM_PROMPT } from './promptBuilder';
 import { parseTriageResponse } from './parser';
-import { enforceEscalationFloor, enforceRefundWindow } from './policyGuards';
+import {
+  enforceBillingReview,
+  enforceEscalationFloor,
+  enforceRefundWindow,
+  enforceUrgencyFloor,
+} from './policyGuards';
 import { findLeakedInternalNote } from './replySafety';
 import { getLLMClient } from '../llm/client';
 import { llmTimeoutMs, withTimeout } from '../llm/timeout';
@@ -53,9 +58,15 @@ async function runTriageOnce(ticket: Ticket): Promise<TriageResult> {
       llm.complete({ system: SYSTEM_PROMPT, user: prompt }),
       llmTimeoutMs()
     );
-    const parsed = enforceEscalationFloor(
+    const parsed = enforceUrgencyFloor(
       ticket,
-      enforceRefundWindow(ticket, parseTriageResponse(raw))
+      enforceEscalationFloor(
+        ticket,
+        enforceBillingReview(
+          ticket,
+          enforceRefundWindow(ticket, parseTriageResponse(raw))
+        )
+      )
     );
 
     if (findLeakedInternalNote(parsed.reply, ticket.internalNotes)) {

@@ -176,8 +176,6 @@ export function enforceGroundedReply(
 export const REFUND_WINDOW_DAYS = 30;
 
 const REFUND_REQUEST = /\brefund\b|money back/i;
-const REFUND_DENIAL =
-  /outside (?:our |the )?\d+-day refund window|not eligible|unable to (?:process|approve)|cannot (?:process|approve)|can't (?:process|approve)/i;
 const PURCHASE_DATE_VERIFICATION =
   /verify|confirm|need|provide|share|check/i;
 
@@ -195,7 +193,7 @@ function daysSincePurchase(ticket: Ticket): number | null {
  */
 export function enforceRefundWindow(ticket: Ticket, parsed: ParsedTriage): ParsedTriage {
   const text = `${ticket.subject}\n${ticket.message}`;
-  if (!REFUND_REQUEST.test(text)) return parsed;
+  if (!REFUND_REQUEST.test(text) && parsed.category !== 'refund') return parsed;
 
   const days = daysSincePurchase(ticket);
   if (days === null) {
@@ -226,13 +224,11 @@ export function enforceRefundWindow(ticket: Ticket, parsed: ParsedTriage): Parse
     };
   }
 
-  if (REFUND_DENIAL.test(parsed.reply)) return parsed;
-
   return {
     ...parsed,
     reply: supportReply(
-      `Unfortunately your purchase was ${days} days ago, which is outside our ${REFUND_WINDOW_DAYS}-day refund window, so we are unable to process a refund. As an alternative, we can offer account credit.`
+      `Unfortunately your purchase was ${days} days ago, which is outside our ${REFUND_WINDOW_DAYS}-day refund window, so we are unable to process a refund.`
     ),
-    reasoning: `${parsed.reasoning} Policy guard: the draft approved a refund, but the purchase is outside the ${REFUND_WINDOW_DAYS}-day window required by policy-refund-v3, so the reply was replaced with a denial.`,
+    reasoning: `${parsed.reasoning} Policy guard: outside-window refund replies are replaced with a deterministic denial required by policy-refund-v3.`,
   };
 }

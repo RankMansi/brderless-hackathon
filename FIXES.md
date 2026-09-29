@@ -176,6 +176,14 @@
 - Verification (test name or manual steps): Cleanup baseline: 86 tests passed and build succeeded. After cleanup: full `npm test`, `npm run build`, strict unused-symbol typecheck, and `git diff --check`.
 - Commit: f6039b3
 
+### 23. Mixed refund language could bypass the eligibility guard  [priority: high]
+- Symptom: An out-of-window draft containing both denial wording and an approval, such as “cannot process a partial refund, so I issued a full refund,” passed unchanged. The denial template also offered account credit that is absent from the active policy, and a model-classified refund could avoid the guard when the customer omitted refund keywords.
+- Reproduction: Pass the mixed draft above for T-1002 to `enforceRefundWindow`, or classify T-1012 as `refund` with an approval draft. Before the fix both drafts passed unchanged.
+- Root cause: The guard trusted any denial-like substring, keyed only on customer wording, and reused an alternative from the deprecated refund policy.
+- Fix (and why this layer): Outside-window refund replies are now always replaced with a deterministic active-policy denial, refund category also activates the guard, and the unsupported credit offer was removed. Eligibility enforcement belongs in the deterministic policy layer rather than model prompting.
+- Verification (test name or manual steps): `tests/refundGuardCoverage.test.ts`; full suite 88 tests passed and production build succeeded.
+- Commit: (this commit)
+
 ## Found but not fixed
 
 - `daysAgo` in the seed data uses local `setDate`, so a gap that crosses daylight saving time can floor one day short (T-1008's structured age was 198 days while the message says 200). Every seed refund is far from the 30-day boundary, and the guard uses the same timestamps the prompt shows the model. I left the generator alone.

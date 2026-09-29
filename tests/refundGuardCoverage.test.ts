@@ -30,6 +30,30 @@ describe('refund policy guard coverage', () => {
     expect(result.reply).not.toMatch(/you are eligible|return your payment/i);
   });
 
+  it('replaces a mixed denial and approval outside the refund window', () => {
+    const mixedDraft: ParsedTriage = {
+      ...permissiveDraft,
+      category: 'refund',
+      reply:
+        'We cannot process a partial refund, so I issued a full refund to your card today.',
+    };
+    const result = enforceRefundWindow(getTicket('T-1002')!, mixedDraft);
+
+    expect(result.reply).toMatch(/unable to process a refund/i);
+    expect(result.reply).not.toMatch(/issued a full refund|account credit/i);
+  });
+
+  it('uses the parsed refund category when the customer avoids refund keywords', () => {
+    const categoryOnlyDraft: ParsedTriage = {
+      ...permissiveDraft,
+      category: 'refund',
+    };
+    const result = enforceRefundWindow(getTicket('T-1012')!, categoryOnlyDraft);
+
+    expect(result.reply).toMatch(/verify.*purchase date/i);
+    expect(result.reply).not.toMatch(/you are eligible|return your payment/i);
+  });
+
   it('does not rewrite a non-refund ticket', () => {
     const result = enforceRefundWindow(getTicket('T-1012')!, permissiveDraft);
     expect(result).toBe(permissiveDraft);

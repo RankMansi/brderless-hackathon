@@ -70,6 +70,14 @@
 - Root cause: `getLLMClient` used its final `else` branch for both `mock` and every unknown provider.
 - Fix (and why this layer): The client factory now selects `MockLLM` only for the explicit `mock` value and throws for every unsupported value. Provider selection belongs at the configuration boundary, before triage can run with the wrong backend.
 - Verification (test name or manual steps): `tests/llmProvider.test.ts`.
+- Commit: 68a53c6
+
+### 10. Loading an existing triage retried every failure as a generation request  [priority: high]
+- Symptom: `TicketView` generated a new triage after any `GET /triage` failure, not only the expected 404. A network error, 500, or authorization failure could therefore trigger a costly write and hide the real read failure. Separately, a failed ticket-detail request left the UI saying “Loading ticket…” forever.
+- Reproduction: Make `GET /api/tickets/T-1001/triage` return 500 (or reject the fetch). Before the fix the `.catch()` immediately called `POST /api/tickets/T-1001/triage`. Make the ticket-detail GET fail and the detail pane never left its loading state.
+- Root cause: The API helper discarded response status and `TicketView` treated every rejection as “no triage result yet.” Ticket-detail errors were converted back to `ticket = null`, which was also the loading sentinel.
+- Fix (and why this layer): `src/api.ts` now throws `ApiError` with the HTTP status. `TicketView` generates only for a 404 and shows all other triage errors. It tracks ticket-load errors separately so the detail pane can distinguish failure from loading.
+- Verification (test name or manual steps): `tests/apiErrors.test.ts`. Manual: return 500 from the triage GET and verify no POST is sent and the error banner is shown; stop the API and select a ticket, then verify “Could not load ticket” replaces the indefinite loading message.
 - Commit: (this commit)
 
 ## Found but not fixed

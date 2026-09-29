@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Ticket, TriageResult } from '../../shared/types';
-import { fetchTicket, fetchTriage, generateTriage } from '../api';
+import {
+  fetchTicket,
+  fetchTriage,
+  generateTriage,
+  shouldGenerateMissingTriage,
+} from '../api';
 import { shouldApplyTriage } from '../triageFreshness';
 import { TriagePanel } from './TriagePanel';
 
@@ -11,6 +16,7 @@ interface Props {
 
 export function TicketView({ ticketId, onTriageComplete }: Props) {
   const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [ticketError, setTicketError] = useState<string | null>(null);
   const [triage, setTriage] = useState<TriageResult | null>(null);
   const [triageLoading, setTriageLoading] = useState(false);
   const [triageError, setTriageError] = useState<string | null>(null);
@@ -20,6 +26,7 @@ export function TicketView({ ticketId, onTriageComplete }: Props) {
     const gen = ++generation.current;
     const requestedId = ticketId;
     setTicket(null);
+    setTicketError(null);
     setTriage(null);
     setTriageLoading(true);
     setTriageError(null);
@@ -28,22 +35,23 @@ export function TicketView({ ticketId, onTriageComplete }: Props) {
       .then((next) => {
         if (generation.current === gen) setTicket(next);
       })
-      .catch(() => {
-        if (generation.current === gen) setTicket(null);
+      .catch((e: Error) => {
+        if (generation.current === gen) setTicketError(e.message);
       });
 
     // Load the existing triage, or generate one on first view.
     // Clear the previous ticket's result first, and drop responses that
     // arrive after the agent has switched tickets or clicked Regenerate.
     fetchTriage(requestedId)
-      .catch(() =>
-        generateTriage(requestedId).then((r) => {
+      .catch((error: unknown) => {
+        if (!shouldGenerateMissingTriage(error)) throw error;
+        return generateTriage(requestedId).then((r) => {
           // The result is already stored for this ticket, so the list should
           // refresh even if the agent has moved on. The detail pane stays gated.
           onTriageComplete();
           return r;
-        })
-      )
+        });
+      })
       .then((result) => {
         if (shouldApplyTriage(requestedId, result, gen, generation.current)) setTriage(result);
       })
@@ -74,6 +82,7 @@ export function TicketView({ ticketId, onTriageComplete }: Props) {
       });
   };
 
+  if (ticketError) return <div className="error-banner">Could not load ticket: {ticketError}</div>;
   if (!ticket) return <div className="empty-state">Loading ticket…</div>;
 
   return (

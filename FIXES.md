@@ -110,6 +110,14 @@
 - Root cause: The first observability fix serialized the full prompt and raw model output. Those fields were useful for debugging but were not safe defaults for durable logs.
 - Fix (and why this layer): The triage service now keeps retrieval ids/scores, final classification, and prompt structure while replacing the untrusted customer block and model text values with explicit redaction markers. The logged query is limited to the subject. Redaction is applied at the logging boundary so model behavior and stored results do not change.
 - Verification (test name or manual steps): `tests/triageLogPrivacy.test.ts`; the existing `tests/triageLog.test.ts` still proves the diagnostic fields and policy scores exist.
+- Commit: 031ff2d
+
+### 15. The triage API returned raw provider failures to the browser  [priority: high]
+- Symptom: A failed provider request was returned verbatim as HTTP 500. Provider response bodies can contain internal diagnostics or credentials, and callers could not distinguish a timeout from an invalid upstream response.
+- Reproduction: Make the client throw `LLM request failed (401): invalid key sk-secret-value`. Before the fix `POST /triage` returned that complete string with status 500.
+- Root cause: The route cast every thrown value to `Error` and sent `.message` directly.
+- Fix (and why this layer): The route now maps service/provider errors to bounded public messages and meaningful 502/503/504 statuses, while unexpected errors remain a generic 500. Detailed context remains in the redacted server log. Translating internal failures into an HTTP contract belongs at the route boundary.
+- Verification (test name or manual steps): `tests/httpErrors.test.ts`.
 - Commit: (this commit)
 
 ## Found but not fixed

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { TicketSummary } from '../shared/types';
 import { db, getTicket } from './store';
+import { toTriageHttpError } from './httpErrors';
 import { runTriage } from './triage/triageService';
 
 export const api = Router();
@@ -46,7 +47,8 @@ api.post('/tickets/:id/triage', async (req, res) => {
     const result = await runTriage(ticket);
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    const response = toTriageHttpError(err);
+    res.status(response.status).json({ error: response.message });
   }
 });
 
